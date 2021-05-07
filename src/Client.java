@@ -1,4 +1,6 @@
 import java.net.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.io.*;
 import java.util.*;
 
@@ -9,6 +11,8 @@ public class Client {
     private static ObjectOutputStream objectOutputStream;
     private static InputStream inputStream;
     private static ObjectInputStream objectInputStream;
+
+    MessageDigest messageDigest;
 
     public Client() {
         try {
@@ -24,7 +28,9 @@ public class Client {
             inputStream = socket.getInputStream();
             // create a DataInputStream so we can read data from it.
             objectInputStream = new ObjectInputStream(inputStream);
-        } catch (IOException e) {
+            // define MessageDigest class algorithm
+            messageDigest = MessageDigest.getInstance("SHA-256");
+        } catch (IOException | NoSuchAlgorithmException e) {
             System.out.println(e);
         }
     }
@@ -34,7 +40,10 @@ public class Client {
         Scanner scan = new Scanner(System.in);
         String command = "default";
         String message = "";
-        String username= "";
+        String username = "";
+        String password = "";
+        Console console = System.console();
+        byte[] vaultKey = null;
         List<String> messages = new ArrayList<String>();
         System.out.println("what do you want to do? (login/register)");
         while (true) {
@@ -42,13 +51,24 @@ public class Client {
                 switch (command) {
                     case "default":
                         message = scan.nextLine();
-                        objectOutputStream.writeObject(message);
-                        objectOutputStream.reset();
+                        send(message);
                         break;
                     case "username":
                         username = scan.nextLine();
-                        objectOutputStream.writeObject(username);
-                        objectOutputStream.reset();
+                        send(username);
+                        break;
+                    case "password":
+                        password = new String(console.readPassword());
+                        // hashing vault key + pass to get the login password
+                        // hash(vaultKey+pass)
+                        // hash(hash(user+pass)+pass)
+                        messageDigest.update((username + password).getBytes());
+                        vaultKey = messageDigest.digest();
+                        System.out.println("[DEBUG] first digest: " + hexaToString(vaultKey));
+                        messageDigest.update((hexaToString(vaultKey) + password).getBytes());
+                        byte[] loginPassword = messageDigest.digest();
+                        System.out.println("[DEBUG] final digest: " + hexaToString(loginPassword));
+                        send(hexaToString(loginPassword));
                         break;
                     default:
                         break;
@@ -68,7 +88,7 @@ public class Client {
     }
 
     // send message to the server and reset the stream
-    public static void send(String message){
+    public static void send(String message) {
         try {
             objectOutputStream.writeObject(message);
             objectOutputStream.reset();

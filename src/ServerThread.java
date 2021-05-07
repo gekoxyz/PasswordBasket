@@ -2,6 +2,8 @@ import java.net.Socket;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +22,14 @@ class ServerThread extends Thread {
     private static ObjectInputStream objectInputStream;
 
     private static List<String> messages = new ArrayList<String>();
+
+    private static String username = "";
+    private static String password = "";
+    private static String salt = "";
+    private static String hashedPassword = "";
+    private static boolean invalidUsername;
+    private static String storedPassword = "";
+    private static String service = "";
 
     public ServerThread(Socket richiestaClient) {
         try {
@@ -77,8 +87,55 @@ class ServerThread extends Thread {
         System.out.println("[DEBUG] client selected register " + socket);
         messages.add("username");
         messages.add("You selected register");
-        messages.add("What username do you want?");
+        invalidUsername = true;
+        while (invalidUsername) {
+            messages.add("input the username you want");
+            send(messages);
+            // getting username
+            boolean usernameExists = checkUsernameExistence(dbConnection);
+            if (usernameExists) {
+                System.out.println("[DEBUG] username exists, not available for the registration");
+                messages.add("username");
+                messages.add("sorry, username is taken :(");
+            } else {
+                System.out.println("[DEBUG] username does not exists, available for the registration");
+                messages.add("password");
+                messages.add("username is not taken yet :)");
+                invalidUsername = false;
+            }
+        }
+        System.out.println("[DEBUG] username not taken, sending result to " + socket);
+        messages.add("Input the password");
         send(messages);
+        // get password
+        // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
+        try {
+            password = (String) objectInputStream.readObject();
+        } catch (ClassNotFoundException | IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("[DEBUG] got password request");
+        /**
+         *  password = (String) objectInputStream.readObject();
+         *  // hashing the password, generating a random salt and saving it to the database
+         *  // to finally secure login credentials
+         *  salt = hexaToString(generateSalt());
+         *  messageDigest.update((password + salt).getBytes());
+         *  hashedPassword = hexaToString(messageDigest.digest());
+         *  System.out.println("[DEBUG] got password request");
+         *  // preparing insert query and executing it
+         *  preparedStatement = dbConnection.prepareStatement("INSERT INTO users_login (username, password, salt) VALUES (?, ?, ?)");
+         *  preparedStatement.setString(1, username);
+         *  preparedStatement.setString(2, hashedPassword);
+         *  preparedStatement.setString(3, salt);
+         *  // TODO: if rows affected = 0 throw login error
+         *  int rowsAffected = preparedStatement.executeUpdate();
+         *  System.out.println("[DEBUG] rows affected: " + rowsAffected);
+         *  messages.add(new Message("default"));
+         *  messages.add(new Message("registration completed!"));
+         *  messages.add(new Message("type login to authenticate"));
+         *  sendAndFlush(messages);
+         */
     }
 
     private static void login(Connection dbConnection) {
@@ -90,7 +147,7 @@ class ServerThread extends Thread {
     }
 
     // resetto la stream, scrivo l'oggetto e pulisco la lista di messaggi
-    private static void send(List<String> messagesToSend){
+    private static void send(List<String> messagesToSend) {
         System.out.println("[DEBUG] Sending data to " + socket);
         try {
             objectOutputStream.reset();
@@ -99,6 +156,30 @@ class ServerThread extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    // check if username exists in database
+    private static boolean checkUsernameExistence(Connection dbConnection) {
+        String username;
+        try {
+            username = (String) objectInputStream.readObject();
+            System.out.println("[DEBUG] got username for login");
+            PreparedStatement preparedStatement = dbConnection
+                    .prepareStatement("SELECT * FROM users_login WHERE username = ?");
+            preparedStatement.setString(1, username);
+            ResultSet rs = preparedStatement.executeQuery();
+            if (!rs.next()) {
+                return false;
+            } else {
+                storedPassword = rs.getString("password");
+                salt = rs.getString("salt");
+                return true;
+            }
+        } catch (ClassNotFoundException | IOException | SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+
     }
 
     // convert digest to a string

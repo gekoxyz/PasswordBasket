@@ -77,6 +77,7 @@ class ServerThread extends Thread {
         System.out.println("[DEBUG] client selected register " + socket);
         messages.add("username");
         messages.add("You selected register");
+        messages.add("What username do you want?");
         send(messages);
     }
 
@@ -84,6 +85,7 @@ class ServerThread extends Thread {
         System.out.println("[DEBUG] client selected login " + socket);
         messages.add("username");
         messages.add("You selected login");
+        messages.add("Input your username");
         send(messages);
     }
 

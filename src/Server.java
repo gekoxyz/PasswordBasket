@@ -1,14 +1,13 @@
 import java.net.*;
 import java.io.*;
 
-public class Server extends Thread {
+public class Server{
     private ServerSocket server;
 
     public Server() {
         try {
             server = new ServerSocket(10000);
-            System.out.println("Server attivo");
-            this.start();
+            System.out.println("[INFO] server attivo");
         } catch (IOException e) {
             System.out.println(e);
         }
@@ -18,7 +17,7 @@ public class Server extends Thread {
         try {
             while (true) {
                 Socket clientRequest = server.accept();
-                new ServerThread(clientRequest);
+                new Thread(new ServerThread(clientRequest)).start();
             }
         } catch (IOException e) {
             System.out.println(e);

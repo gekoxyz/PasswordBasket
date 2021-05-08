@@ -73,6 +73,7 @@ public class Client {
                     default:
                         break;
                 }
+                System.out.println("[DEBUG] waiting for message " + socket);
                 messages = (List<String>) objectInputStream.readObject();
                 System.out.println("Received [" + (messages.size() - 1) + "] messages from: " + socket);
                 command = messages.get(0);
@@ -90,8 +91,9 @@ public class Client {
     // send message to the server and reset the stream
     public static void send(String message) {
         try {
+            System.out.println("[DEBUG] sending data as " + socket);
             objectOutputStream.writeObject(message);
-            objectOutputStream.reset();
+            objectOutputStream.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }

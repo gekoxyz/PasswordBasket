@@ -58,8 +58,6 @@ class ServerThread implements Runnable {
             // non puo` uscire un NoSuchAlgorithmException perche` so che l'algoritmo esiste
             // ed e` cosi` definito
             System.out.println("[ERROR] errore di i/o");
-        } catch (SQLException | ClassNotFoundException e) {
-            System.out.println("[ERROR] errore nella connessione al database classnotfound/sql " + e);
         }
     }
 
@@ -86,10 +84,17 @@ class ServerThread implements Runnable {
         }
     }
 
-    private static Connection connectToDatabase() throws SQLException, ClassNotFoundException {
+    // connessione al database
+    private static Connection connectToDatabase() {
+        Connection connection = null;
         System.out.println("[INFO] Intializing database connection");
-        Class.forName("com.mysql.cj.jdbc.Driver");
-        return DriverManager.getConnection("jdbc:mysql://localhost:3306/testmat", "root", "");
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/testmat", "root", "");
+        } catch (SQLException | ClassNotFoundException e) {
+            System.out.println("[ERROR] errore nella connessione al database classnotfound/sql " + e);
+        }
+        return connection;
     }
 
     private static void register(Connection dbConnection) {

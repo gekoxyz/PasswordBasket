@@ -1,7 +1,7 @@
 import java.net.*;
 import java.io.*;
 
-public class Server{
+public class Server {
     private ServerSocket server;
 
     public Server() {
@@ -11,6 +11,11 @@ public class Server{
         } catch (IOException e) {
             System.out.println(e);
         }
+    }
+
+    public static void main(String[] args) {
+        Server server = new Server();
+        server.run();
     }
 
     public void run() {

@@ -35,6 +35,11 @@ public class Client {
         }
     }
 
+    public static void main(String[] args) {
+        Client client = new Client();
+        client.conversazione();
+    }
+
     public void conversazione() {
         // conversazione lato client
         Scanner scan = new Scanner(System.in);
@@ -50,14 +55,17 @@ public class Client {
             try {
                 switch (command) {
                     case "default":
+                        System.out.println("[DEBUG] switch option: default");
                         message = scan.nextLine();
                         send(message);
                         break;
                     case "username":
+                        System.out.println("[DEBUG] switch option: username");
                         username = scan.nextLine();
                         send(username);
                         break;
                     case "password":
+                        System.out.println("[DEBUG] switch option: password");
                         password = new String(console.readPassword());
                         // hashing vault key + pass to get the login password
                         // hash(vaultKey+pass)

@@ -27,7 +27,7 @@ class ServerThread implements Runnable {
     private static List<String> messages = new ArrayList<String>();
     private static MessageDigest messageDigest;
 
-    // private static String username = "";
+    private static String username = "";
     // private static String password = "";
     private static String salt = "";
     // private static String hashedPassword = "";
@@ -66,6 +66,8 @@ class ServerThread implements Runnable {
         try {
             boolean active = true;
             while (active) {
+                System.out.println("[THREAD] " + Thread.currentThread().getName());
+                System.out.println("[DEBUG] current socket: " + socket);
                 String msg = (String) objectInputStream.readObject();
                 // -- SELECT CASE FOR USER LOGIN/REGISTER --
                 switch (msg) {
@@ -98,6 +100,7 @@ class ServerThread implements Runnable {
     }
 
     private static void register(Connection dbConnection) {
+        System.out.println("[THREAD] " + Thread.currentThread().getName());
         System.out.println("[DEBUG] client selected register " + socket);
         messages.add("username");
         messages.add("You selected register");
@@ -155,15 +158,23 @@ class ServerThread implements Runnable {
     }
 
     private static void login(Connection dbConnection) {
+        System.out.println("[THREAD] " + Thread.currentThread().getName());
         System.out.println("[DEBUG] client selected login " + socket);
         messages.add("username");
         messages.add("You selected login");
         messages.add("Input your username");
         send(messages);
+        try {
+            username = (String) objectInputStream.readObject();
+            System.out.println("[INFO] received " + username + " from " + socket);
+        } catch (ClassNotFoundException | IOException e) {
+            System.out.println("[DEBUG] error while waiting for client login username");
+        }
     }
 
     // resetto la stream, scrivo l'oggetto e pulisco la lista di messaggi
     private static void send(List<String> messagesToSend) {
+        System.out.println("[THREAD] " + Thread.currentThread().getName());
         System.out.println("[DEBUG] Sending data to " + socket);
         try {
             objectOutputStream.writeObject(messagesToSend);
@@ -195,7 +206,6 @@ class ServerThread implements Runnable {
             e.printStackTrace();
             return false;
         }
-
     }
 
     // convert digest to a string

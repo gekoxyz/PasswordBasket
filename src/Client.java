@@ -5,12 +5,12 @@ import java.io.*;
 import java.util.*;
 
 public class Client {
-    private static Socket socket;
+    private Socket socket;
 
-    private static OutputStream outputStream;
-    private static ObjectOutputStream objectOutputStream;
-    private static InputStream inputStream;
-    private static ObjectInputStream objectInputStream;
+    private OutputStream outputStream;
+    private ObjectOutputStream objectOutputStream;
+    private InputStream inputStream;
+    private ObjectInputStream objectInputStream;
 
     MessageDigest messageDigest;
 
@@ -40,7 +40,7 @@ public class Client {
         client.conversazione();
     }
 
-    public void conversazione() {
+    private void conversazione() {
         // conversazione lato client
         Scanner scan = new Scanner(System.in);
         String command = "default";
@@ -97,7 +97,7 @@ public class Client {
     }
 
     // send message to the server and reset the stream
-    public static void send(String message) {
+    private void send(String message) {
         try {
             System.out.println("[DEBUG] sending data as " + socket);
             objectOutputStream.writeObject(message);
@@ -108,7 +108,7 @@ public class Client {
     }
 
     // Convert digest to a string
-    public static String hexaToString(byte[] digest) {
+    private String hexaToString(byte[] digest) {
         StringBuffer hexString = new StringBuffer();
         for (int i = 0; i < digest.length; i++) {
             if ((0xff & digest[i]) < 0x10) {
@@ -121,7 +121,7 @@ public class Client {
     }
 
     // Convert byte array to hexadecimal
-    public static String bytesToHexa(byte[] bytes) {
+    private String bytesToHexa(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));

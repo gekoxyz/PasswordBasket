@@ -16,24 +16,24 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 
 class ServerThread implements Runnable {
-    private static Socket socket;
+    private Socket socket;
 
-    private static Connection dbConnection;
-    private static OutputStream outputStream;
-    private static ObjectOutputStream objectOutputStream;
-    private static InputStream inputStream;
-    private static ObjectInputStream objectInputStream;
+    private Connection dbConnection = null;
+    private OutputStream outputStream;
+    private ObjectOutputStream objectOutputStream;
+    private InputStream inputStream;
+    private ObjectInputStream objectInputStream;
 
-    private static List<String> messages = new ArrayList<String>();
-    private static MessageDigest messageDigest;
+    private List<String> messages = new ArrayList<String>();
+    private MessageDigest messageDigest;
 
-    private static String username = "";
-    // private static String password = "";
-    private static String salt = "";
-    // private static String hashedPassword = "";
-    private static boolean invalidUsername;
-    private static String storedPassword = "";
-    // private static String service = "";
+    private String username = "";
+    private String password = "";
+    private String salt = "";
+    private String hashedPassword = "";
+    private boolean invalidUsername;
+    private String storedPassword = "";
+    // private String service = "";
 
     public ServerThread(Socket richiestaClient) {
         try {
@@ -66,9 +66,9 @@ class ServerThread implements Runnable {
         try {
             boolean active = true;
             while (active) {
-                System.out.println("[THREAD] " + Thread.currentThread().getName());
                 System.out.println("[DEBUG] current socket: " + socket);
                 String msg = (String) objectInputStream.readObject();
+                System.out.println("[CLIENT] " + msg);
                 // -- SELECT CASE FOR USER LOGIN/REGISTER --
                 switch (msg) {
                     case "login":
@@ -87,7 +87,7 @@ class ServerThread implements Runnable {
     }
 
     // connessione al database
-    private static Connection connectToDatabase() {
+    private Connection connectToDatabase() {
         Connection connection = null;
         System.out.println("[INFO] Intializing database connection");
         try {
@@ -99,8 +99,7 @@ class ServerThread implements Runnable {
         return connection;
     }
 
-    private static void register(Connection dbConnection) {
-        System.out.println("[THREAD] " + Thread.currentThread().getName());
+    private void register(Connection dbConnection) {
         System.out.println("[DEBUG] client selected register " + socket);
         messages.add("username");
         messages.add("You selected register");
@@ -122,43 +121,41 @@ class ServerThread implements Runnable {
             }
         }
         System.out.println("[DEBUG] username not taken, sending result to " + socket);
-        // messages.add("Input the password");
-        // send(messages);
-        // // get password
-        // // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
-        // try {
-        // password = (String) objectInputStream.readObject();
-        // } catch (ClassNotFoundException | IOException e) {
-        // e.printStackTrace();
-        // }
-        // System.out.println("[DEBUG] got password request");
-        // // hashing the password, generating a random salt and saving it to the
-        // database
-        // // to finally secure login credentials
-        // salt = hexaToString(generateSalt());
-        // messageDigest.update((password + salt).getBytes());
-        // hashedPassword = hexaToString(messageDigest.digest());
-        // try {
-        // // preparing insert query and executing it
-        // PreparedStatement preparedStatement = dbConnection.prepareStatement("INSERT
-        // INTO users_login (username, password, salt) VALUES (?, ?, ?)");
-        // preparedStatement.setString(1, username);
-        // preparedStatement.setString(2, hashedPassword);
-        // preparedStatement.setString(3, salt);
-        // // TODO: if rows affected = 0 throw login error
-        // int rowsAffected = preparedStatement.executeUpdate();
-        // System.out.println("[DEBUG] rows affected: " + rowsAffected);
-        // } catch (SQLException e) {
-        // e.printStackTrace();
-        // }
-        // messages.add("default");
-        // messages.add("registration completed!");
-        // messages.add("type login to authenticate");
-        // send(messages);
+        messages.add("Input the password");
+        send(messages);
+        // get password
+        // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
+        try {
+            password = (String) objectInputStream.readObject();
+        } catch (ClassNotFoundException | IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("[DEBUG] got password request");
+        // hashing the password, generating a random salt and saving it to the database
+        // to finally secure login credentials
+        salt = hexaToString(generateSalt());
+        messageDigest.update((password + salt).getBytes());
+        hashedPassword = hexaToString(messageDigest.digest());
+        try {
+            // preparing insert query and executing it
+            PreparedStatement preparedStatement = dbConnection
+                    .prepareStatement("INSERT INTO users_login (username, password, salt) VALUES (?, ?, ?)");
+            preparedStatement.setString(1, username);
+            preparedStatement.setString(2, hashedPassword);
+            preparedStatement.setString(3, salt);
+            // TODO: if rows affected = 0 throw login error
+            int rowsAffected = preparedStatement.executeUpdate();
+            System.out.println("[DEBUG] rows affected: " + rowsAffected);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        messages.add("default");
+        messages.add("registration completed!");
+        messages.add("type login to authenticate");
+        send(messages);
     }
 
-    private static void login(Connection dbConnection) {
-        System.out.println("[THREAD] " + Thread.currentThread().getName());
+    private void login(Connection dbConnection) {
         System.out.println("[DEBUG] client selected login " + socket);
         messages.add("username");
         messages.add("You selected login");
@@ -173,8 +170,7 @@ class ServerThread implements Runnable {
     }
 
     // resetto la stream, scrivo l'oggetto e pulisco la lista di messaggi
-    private static void send(List<String> messagesToSend) {
-        System.out.println("[THREAD] " + Thread.currentThread().getName());
+    private void send(List<String> messagesToSend) {
         System.out.println("[DEBUG] Sending data to " + socket);
         try {
             objectOutputStream.writeObject(messagesToSend);
@@ -186,7 +182,7 @@ class ServerThread implements Runnable {
     }
 
     // check if username exists in database
-    private static boolean checkUsernameExistence(Connection dbConnection) {
+    private boolean checkUsernameExistence(Connection dbConnection) {
         String username;
         try {
             username = (String) objectInputStream.readObject();
@@ -209,7 +205,7 @@ class ServerThread implements Runnable {
     }
 
     // convert digest to a string
-    private static String hexaToString(byte[] digest) {
+    private String hexaToString(byte[] digest) {
         StringBuffer hexString = new StringBuffer();
         for (int i = 0; i < digest.length; i++) {
             if ((0xff & digest[i]) < 0x10) {
@@ -222,7 +218,7 @@ class ServerThread implements Runnable {
     }
 
     // generate random salt for password storing
-    private static byte[] generateSalt() {
+    private byte[] generateSalt() {
         SecureRandom random = new SecureRandom();
         byte bytes[] = new byte[8];
         random.nextBytes(bytes);

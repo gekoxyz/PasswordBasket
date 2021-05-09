@@ -33,7 +33,7 @@ class ServerThread implements Runnable {
     private String hashedPassword = "";
     private boolean invalidUsername;
     private String storedPassword = "";
-    // private String service = "";
+    private String service = "";
 
     public ServerThread(Socket richiestaClient) {
         try {
@@ -63,27 +63,24 @@ class ServerThread implements Runnable {
 
     public void run() {
         // conversazione lato server
-        try {
-            boolean active = true;
-            while (active) {
-                System.out.println("[DEBUG] current socket: " + socket);
-                String msg = (String) objectInputStream.readObject();
-                System.out.println("[CLIENT] " + msg);
-                // -- SELECT CASE FOR USER LOGIN/REGISTER --
-                switch (msg) {
-                    case "login":
-                        login(dbConnection);
-                        break;
-                    case "register":
-                        register(dbConnection);
-                        break;
-                    default:
-                        break;
-                }
+        boolean active = true;
+        while (active) {
+            System.out.println("[DEBUG] current socket: " + socket);
+            String msg = receiveString();
+            System.out.println("[CLIENT] " + msg);
+            // -- SELECT CASE FOR USER LOGIN/REGISTER --
+            switch (msg) {
+                case "login":
+                    login(dbConnection);
+                    break;
+                case "register":
+                    register(dbConnection);
+                    break;
+                default:
+                    break;
             }
-        } catch (IOException | ClassNotFoundException e) {
-            System.out.println("[ERROR] errore nello switch azioni ioexception " + e);
         }
+
     }
 
     // connessione al database
@@ -97,6 +94,27 @@ class ServerThread implements Runnable {
             System.out.println("[ERROR] errore nella connessione al database classnotfound/sql " + e);
         }
         return connection;
+    }
+
+    // resetto la stream, scrivo l'oggetto e pulisco la lista di messaggi
+    private void send(List<String> messagesToSend) {
+        System.out.println("[DEBUG] Sending data to " + socket);
+        try {
+            objectOutputStream.writeObject(messagesToSend);
+            objectOutputStream.flush();
+            messages.clear();
+        } catch (IOException e) {
+            System.out.println("[ERROR] error occurred while sending message");
+        }
+    }
+
+    private String receiveString() {
+        try {
+            return (String) objectInputStream.readObject();
+        } catch (ClassNotFoundException | IOException e) {
+            System.out.println("[ERROR] error while reading String from client");
+        }
+        return "";
     }
 
     private void register(Connection dbConnection) {
@@ -125,11 +143,7 @@ class ServerThread implements Runnable {
         send(messages);
         // get password
         // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
-        try {
-            password = (String) objectInputStream.readObject();
-        } catch (ClassNotFoundException | IOException e) {
-            e.printStackTrace();
-        }
+        password = receiveString();
         System.out.println("[DEBUG] got password request");
         // hashing the password, generating a random salt and saving it to the database
         // to finally secure login credentials
@@ -158,34 +172,146 @@ class ServerThread implements Runnable {
     private void login(Connection dbConnection) {
         System.out.println("[DEBUG] client selected login " + socket);
         messages.add("username");
-        messages.add("You selected login");
-        messages.add("Input your username");
-        send(messages);
-        try {
-            username = (String) objectInputStream.readObject();
-            System.out.println("[INFO] received " + username + " from " + socket);
-        } catch (ClassNotFoundException | IOException e) {
-            System.out.println("[DEBUG] error while waiting for client login username");
+        messages.add("you selected login");
+        invalidUsername = true;
+        while (invalidUsername) {
+            messages.add("input your username");
+            send(messages);
+            // getting username
+            boolean usernameExists = checkUsernameExistence(dbConnection);
+            if (!usernameExists) {
+                System.out.println("[DEBUG] username doesn't exist, invalid operation");
+                messages.add("username");
+                messages.add("input username is not valid");
+            } else {
+                System.out.println("[DEBUG] username exists, valid operation");
+                messages.add("password");
+                invalidUsername = false;
+            }
         }
-    }
+        // richiesta inserimento password + verifica validita` password
+        boolean invalidPassword = true;
+        while (invalidPassword) {
+            System.out.println("[DEBUG] asking for the password");
+            messages.add("input your password");
+            send(messages);
+            password = receiveString();
+            System.out.println("[DEBUG] password received");
+            messageDigest.update((password + salt).getBytes());
+            hashedPassword = hexaToString(messageDigest.digest());
+            System.out.println("[DEBUG] password validation");
+            if (storedPassword.equals(hashedPassword)) {
+                // login is valid
+                // messages.add(new Message("valid password!"));
+                System.out.println("[DEBUG] valid password");
+                messages.add("default");
+                invalidPassword = false;
+            } else {
+                // password invalid
+                System.out.println("[DEBUG] invalid password");
+                messages.add("password");
+                messages.add("invalid password!");
+            }
+        }
+        // password validata, richiesta di inserimento/lettura/modifica/cancellazione
+        // password
+        boolean loggedIn = true;
+        while (loggedIn) {
+            messages.add("Logged in succesfully!");
+            messages.add("What action do you want to perform?");
+            messages.add("1. Input account");
+            messages.add("2. Get service accounts");
+            messages.add("3. Remove account");
+            send(messages);
+            String command = receiveString();
+            System.out.println("[DEBUG] user input: " + command);
+            messages.add("default");
+            switch (command) {
+                case "1":
+                    // needings : service, service username, service password
+                    // GETTING SERVICE
+                    messages.add("What service do you want to save?");
+                    send(messages);
+                    service = receiveString();
+                    System.out.println("[DEBUG] user wants to add service " + service);
+                    // GETTING USERNAME FOR SERVICE
+                    messages.add("username");
+                    messages.add("What's the username for: " + service + "?");
+                    send(messages);
+                    String serviceUsername = receiveString();
+                    System.out.println("[DEBUG] username of service is " + serviceUsername);
+                    // GETTING PASSWORD FOR SERVICE
+                    messages.add("service_password");
+                    messages.add("What's the password for " + serviceUsername + "?");
+                    send(messages);
+                    String servicePassword = receiveString();
+                    System.out.println("[DEBUG] service password is " + servicePassword);
+                    // insert data in database
+                    // INSERT INTO `users_accounts` (`service`, `service_username`,
+                    // `service_password`, `user`) VALUES ('SERVICE', 'SERVICEUSERNAME',
+                    // 'SERVICEPASSWORD', 'matteo')
+                    PreparedStatement preparedStatement;
+                    try {
+                        preparedStatement = dbConnection.prepareStatement(
+                                "INSERT INTO users_accounts (service, service_username, service_password, user) VALUES (?, ?, ?, ?)");
+                        preparedStatement.setString(1, service);
+                        preparedStatement.setString(2, serviceUsername);
+                        preparedStatement.setString(3, servicePassword);
+                        preparedStatement.setString(4, username);
+                        int rowsAffected = preparedStatement.executeUpdate();
+                        System.out.println("[DEBUG] rows affected:" + rowsAffected);
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case "2":
+                    // needings: service name
+                    // GETTING SERVICE
+                    messages.add("What service do you want to know the account of?");
+                    send(messages);
+                    service = receiveString();
+                    System.out.println("[DEBUG] user wants to get accounts of service " + service);
+                    try {
+                        preparedStatement = dbConnection
+                                .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?;");
+                        preparedStatement.setString(1, service);
+                        preparedStatement.setString(2, username);
+                        ResultSet rs = preparedStatement.executeQuery();
+                        // TODO: mettere tutto nell'arraylist di messaggi e inviare tutto al client
+                        if (!rs.next()) {
+                            // non ci sono account per questo servizio o hai fatto casino non lo so devo
+                            // testare
+                        } else {
+                            String storedUsername = rs.getString("service_username");
+                            String storedPassword = rs.getString("service_password");
+                            messages.add("accounts");
+                            messages.add(storedUsername);
+                            messages.add(storedPassword);
+                            // storedPassword = rs.getString("password");
+                            // salt = rs.getString("salt");
+                            // metto i dati degli account nei messaggi e li invio al client
+                        }
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case "3":
+                    messages.add("delete account");
+                    send(messages);
+                    // needings: service name
+                    break;
+                default:
+                    break;
+            }
+        }
 
-    // resetto la stream, scrivo l'oggetto e pulisco la lista di messaggi
-    private void send(List<String> messagesToSend) {
-        System.out.println("[DEBUG] Sending data to " + socket);
-        try {
-            objectOutputStream.writeObject(messagesToSend);
-            objectOutputStream.flush();
-            messages.clear();
-        } catch (IOException e) {
-            System.out.println("[ERROR] error occurred while sending message");
-        }
     }
 
     // check if username exists in database
     private boolean checkUsernameExistence(Connection dbConnection) {
         String username;
         try {
-            username = (String) objectInputStream.readObject();
+            username = receiveString();
             System.out.println("[DEBUG] got username for login");
             PreparedStatement preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM users_login WHERE username = ?");
@@ -198,7 +324,7 @@ class ServerThread implements Runnable {
                 salt = rs.getString("salt");
                 return true;
             }
-        } catch (ClassNotFoundException | IOException | SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }

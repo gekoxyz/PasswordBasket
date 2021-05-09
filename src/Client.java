@@ -40,10 +40,10 @@ public class Client {
 
     public static void main(String[] args) {
         Client client = new Client();
-        client.conversazione();
+        client.run();
     }
 
-    private void conversazione() {
+    private void run() {
         // conversazione lato client
         Scanner scan = new Scanner(System.in);
         String command = "default";
@@ -58,17 +58,14 @@ public class Client {
             try {
                 switch (command) {
                     case "default":
-                        System.out.println("[DEBUG] switch option: default");
                         message = scan.nextLine();
                         send(message);
                         break;
                     case "username":
-                        System.out.println("[DEBUG] switch option: username");
                         username = scan.nextLine();
                         send(username);
                         break;
                     case "password":
-                        System.out.println("[DEBUG] switch option: password");
                         password = new String(console.readPassword());
                         // hashing vault key + pass to get the login password
                         // hash(vaultKey+pass)
@@ -123,9 +120,8 @@ public class Client {
     // send message to the server and reset the stream
     private void send(String message) {
         try {
-            System.out.println("[DEBUG] sending data as " + socket);
             objectOutputStream.writeObject(message);
-            objectOutputStream.flush();
+            objectOutputStream.reset();
         } catch (IOException e) {
             e.printStackTrace();
         }

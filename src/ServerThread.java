@@ -65,9 +65,7 @@ class ServerThread implements Runnable {
         // conversazione lato server
         boolean active = true;
         while (active) {
-            System.out.println("[DEBUG] current socket: " + socket);
             String msg = receiveString();
-            System.out.println("[CLIENT] " + msg);
             // -- SELECT CASE FOR USER LOGIN/REGISTER --
             switch (msg) {
                 case "login":
@@ -77,6 +75,8 @@ class ServerThread implements Runnable {
                     register(dbConnection);
                     break;
                 default:
+                    messages.add("default");
+                    messages.add("ERROR DURING INPUT SELECTION");
                     break;
             }
         }
@@ -101,7 +101,7 @@ class ServerThread implements Runnable {
         System.out.println("[DEBUG] Sending data to " + socket);
         try {
             objectOutputStream.writeObject(messagesToSend);
-            objectOutputStream.flush();
+            objectOutputStream.reset();
             messages.clear();
         } catch (IOException e) {
             System.out.println("[ERROR] error occurred while sending message");
@@ -213,106 +213,47 @@ class ServerThread implements Runnable {
                 messages.add("invalid password!");
             }
         }
-        // password validata, richiesta di inserimento/lettura/modifica/cancellazione
-        // password
-        boolean loggedIn = true;
-        while (loggedIn) {
-            messages.add("Logged in succesfully!");
-            messages.add("What action do you want to perform?");
-            messages.add("1. Input account");
-            messages.add("2. Get service accounts");
-            messages.add("3. Remove account");
-            send(messages);
-            String command = receiveString();
-            System.out.println("[DEBUG] user input: " + command);
-            messages.add("default");
-            switch (command) {
-                case "1":
-                    // needings : service, service username, service password
-                    // GETTING SERVICE
-                    messages.add("What service do you want to save?");
-                    send(messages);
-                    service = receiveString();
-                    System.out.println("[DEBUG] user wants to add service " + service);
-                    // GETTING USERNAME FOR SERVICE
-                    messages.add("username");
-                    messages.add("What's the username for: " + service + "?");
-                    send(messages);
-                    String serviceUsername = receiveString();
-                    System.out.println("[DEBUG] username of service is " + serviceUsername);
-                    // GETTING PASSWORD FOR SERVICE
-                    messages.add("service_password");
-                    messages.add("What's the password for " + serviceUsername + "?");
-                    send(messages);
-                    String servicePassword = receiveString();
-                    System.out.println("[DEBUG] service password is " + servicePassword);
-                    // insert data in database
-                    // INSERT INTO `users_accounts` (`service`, `service_username`,
-                    // `service_password`, `user`) VALUES ('SERVICE', 'SERVICEUSERNAME',
-                    // 'SERVICEPASSWORD', 'matteo')
-                    PreparedStatement preparedStatement;
-                    try {
-                        preparedStatement = dbConnection.prepareStatement(
-                                "INSERT INTO users_accounts (service, service_username, service_password, user) VALUES (?, ?, ?, ?)");
-                        preparedStatement.setString(1, service);
-                        preparedStatement.setString(2, serviceUsername);
-                        preparedStatement.setString(3, servicePassword);
-                        preparedStatement.setString(4, username);
-                        int rowsAffected = preparedStatement.executeUpdate();
-                        System.out.println("[DEBUG] rows affected:" + rowsAffected);
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case "2":
-                    // needings: service name
-                    // GETTING SERVICE
-                    messages.add("What service do you want to know the account of?");
-                    send(messages);
-                    service = receiveString();
-                    System.out.println("[DEBUG] user wants to get accounts of service " + service);
-                    try {
-                        preparedStatement = dbConnection
-                                .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?;");
-                        preparedStatement.setString(1, service);
-                        preparedStatement.setString(2, username);
-                        ResultSet rs = preparedStatement.executeQuery();
-                        // TODO: mettere tutto nell'arraylist di messaggi e inviare tutto al client
-                        if (!rs.next()) {
-                            // non ci sono account per questo servizio o hai fatto casino non lo so devo
-                            // testare
-                        } else {
-                            String storedUsername = rs.getString("service_username");
-                            String storedPassword = rs.getString("service_password");
-                            messages.add("accounts");
-                            messages.add(storedUsername);
-                            messages.add(storedPassword);
-                            // storedPassword = rs.getString("password");
-                            // salt = rs.getString("salt");
-                            // metto i dati degli account nei messaggi e li invio al client
-                        }
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case "3":
-                    messages.add("delete account");
-                    send(messages);
-                    // needings: service name
-                    break;
-                default:
-                    break;
-            }
-        }
-
     }
+    // messages.add("Input the password");
+    // send(messages);
+    // // get password
+    // // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
+    // try {
+    // password = (String) objectInputStream.readObject();
+    // } catch (ClassNotFoundException | IOException e) {
+    // e.printStackTrace();
+    // }
+    // System.out.println("[DEBUG] got password request");
+    // // hashing the password, generating a random salt and saving it to the
+    // database
+    // // to finally secure login credentials
+    // salt = hexaToString(generateSalt());
+    // messageDigest.update((password + salt).getBytes());
+    // hashedPassword = hexaToString(messageDigest.digest());
+    // try {
+    // // preparing insert query and executing it
+    // PreparedStatement preparedStatement = dbConnection.prepareStatement("INSERT
+    // INTO users_login (username, password, salt) VALUES (?, ?, ?)");
+    // preparedStatement.setString(1, username);
+    // preparedStatement.setString(2, hashedPassword);
+    // preparedStatement.setString(3, salt);
+    // // TODO: if rows affected = 0 throw login error
+    // int rowsAffected = preparedStatement.executeUpdate();
+    // System.out.println("[DEBUG] rows affected: " + rowsAffected);
+    // } catch (SQLException e) {
+    // e.printStackTrace();
+    // }
+    // messages.add("default");
+    // messages.add("registration completed!");
+    // messages.add("type login to authenticate");
+    // send(messages);
 
     // check if username exists in database
     private boolean checkUsernameExistence(Connection dbConnection) {
         String username;
         try {
             username = receiveString();
-            System.out.println("[DEBUG] got username for login");
+            System.out.println("[DEBUG] got username to check if it exists in database");
             PreparedStatement preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM users_login WHERE username = ?");
             preparedStatement.setString(1, username);
@@ -328,6 +269,7 @@ class ServerThread implements Runnable {
             e.printStackTrace();
             return false;
         }
+
     }
 
     // convert digest to a string

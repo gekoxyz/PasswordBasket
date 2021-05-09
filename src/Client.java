@@ -4,6 +4,9 @@ import java.security.NoSuchAlgorithmException;
 import java.io.*;
 import java.util.*;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+
 public class Client {
     private Socket socket;
 
@@ -77,6 +80,27 @@ public class Client {
                         byte[] loginPassword = messageDigest.digest();
                         System.out.println("[DEBUG] final digest: " + hexaToString(loginPassword));
                         send(hexaToString(loginPassword));
+                        break;
+                    case "service_password":
+                        password = new String(console.readPassword());
+                        // get key and encrypt
+                        SecretKeySpec secretKey = new SecretKeySpec(vaultKey, "AES");
+                        System.out.println("[KEY] " + bytesToHexa(vaultKey));
+                        // setto il cipher per fare aes ecb senza padding
+                        Cipher cipher = Cipher.getInstance("AES");
+                        // setto il cipher in modalita` encrypt
+                        cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+                        String encryptedCipher = Base64.getEncoder()
+                                .encodeToString(cipher.doFinal(password.getBytes()));
+                        // ENCRYPTED CIPHER
+                        System.out.println(encryptedCipher);
+                        // send
+                        objectOutputStream.writeObject(encryptedCipher);
+                        objectOutputStream.reset();
+                        // cipher.init(Cipher.DECRYPT_MODE, secretKey);
+                        // // DECRYPTED CIPHER
+                        // System.out.println(new
+                        // String(cipher.doFinal(Base64.getDecoder().decode(encryptedCipher))));
                         break;
                     default:
                         break;

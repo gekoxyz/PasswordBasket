@@ -18,6 +18,7 @@ import java.io.OutputStream;
 class ServerThread implements Runnable {
     private Socket socket;
 
+    private boolean active = true;
     private Connection dbConnection = null;
     private OutputStream outputStream;
     private ObjectOutputStream objectOutputStream;
@@ -63,11 +64,10 @@ class ServerThread implements Runnable {
 
     public void run() {
         // conversazione lato server
-        boolean active = true;
         while (active) {
-            String msg = receiveString();
+            String command = getUserInput();
             // -- SELECT CASE FOR USER LOGIN/REGISTER --
-            switch (msg) {
+            switch (command) {
                 case "login":
                     login(dbConnection);
                     break;
@@ -75,8 +75,6 @@ class ServerThread implements Runnable {
                     register(dbConnection);
                     break;
                 default:
-                    messages.add("default");
-                    messages.add("ERROR DURING INPUT SELECTION");
                     break;
             }
         }
@@ -108,16 +106,18 @@ class ServerThread implements Runnable {
         }
     }
 
-    private String receiveString() {
+    private String getUserInput() {
         try {
             return (String) objectInputStream.readObject();
         } catch (ClassNotFoundException | IOException e) {
             System.out.println("[ERROR] error while reading String from client");
+            active = false;
         }
         return "";
     }
 
     private void register(Connection dbConnection) {
+        String usernameToRegister = "";
         System.out.println("[DEBUG] client selected register " + socket);
         messages.add("username");
         messages.add("You selected register");
@@ -133,6 +133,7 @@ class ServerThread implements Runnable {
                 messages.add("sorry, username is taken :(");
             } else {
                 System.out.println("[DEBUG] username does not exists, available for the registration");
+                usernameToRegister = username;
                 messages.add("password");
                 messages.add("username is not taken yet :)");
                 invalidUsername = false;
@@ -143,7 +144,7 @@ class ServerThread implements Runnable {
         send(messages);
         // get password
         // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
-        password = receiveString();
+        password = getUserInput();
         System.out.println("[DEBUG] got password request");
         // hashing the password, generating a random salt and saving it to the database
         // to finally secure login credentials
@@ -154,7 +155,7 @@ class ServerThread implements Runnable {
             // preparing insert query and executing it
             PreparedStatement preparedStatement = dbConnection
                     .prepareStatement("INSERT INTO users_login (username, password, salt) VALUES (?, ?, ?)");
-            preparedStatement.setString(1, username);
+            preparedStatement.setString(1, usernameToRegister);
             preparedStatement.setString(2, hashedPassword);
             preparedStatement.setString(3, salt);
             // TODO: if rows affected = 0 throw login error
@@ -195,7 +196,7 @@ class ServerThread implements Runnable {
             System.out.println("[DEBUG] asking for the password");
             messages.add("input your password");
             send(messages);
-            password = receiveString();
+            password = getUserInput();
             System.out.println("[DEBUG] password received");
             messageDigest.update((password + salt).getBytes());
             hashedPassword = hexaToString(messageDigest.digest());
@@ -213,46 +214,14 @@ class ServerThread implements Runnable {
                 messages.add("invalid password!");
             }
         }
+        messages.add("successfully logged in!");
+        loggedInOptions();
     }
-    // messages.add("Input the password");
-    // send(messages);
-    // // get password
-    // // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
-    // try {
-    // password = (String) objectInputStream.readObject();
-    // } catch (ClassNotFoundException | IOException e) {
-    // e.printStackTrace();
-    // }
-    // System.out.println("[DEBUG] got password request");
-    // // hashing the password, generating a random salt and saving it to the
-    // database
-    // // to finally secure login credentials
-    // salt = hexaToString(generateSalt());
-    // messageDigest.update((password + salt).getBytes());
-    // hashedPassword = hexaToString(messageDigest.digest());
-    // try {
-    // // preparing insert query and executing it
-    // PreparedStatement preparedStatement = dbConnection.prepareStatement("INSERT
-    // INTO users_login (username, password, salt) VALUES (?, ?, ?)");
-    // preparedStatement.setString(1, username);
-    // preparedStatement.setString(2, hashedPassword);
-    // preparedStatement.setString(3, salt);
-    // // TODO: if rows affected = 0 throw login error
-    // int rowsAffected = preparedStatement.executeUpdate();
-    // System.out.println("[DEBUG] rows affected: " + rowsAffected);
-    // } catch (SQLException e) {
-    // e.printStackTrace();
-    // }
-    // messages.add("default");
-    // messages.add("registration completed!");
-    // messages.add("type login to authenticate");
-    // send(messages);
 
     // check if username exists in database
     private boolean checkUsernameExistence(Connection dbConnection) {
-        String username;
         try {
-            username = receiveString();
+            username = getUserInput();
             System.out.println("[DEBUG] got username to check if it exists in database");
             PreparedStatement preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM users_login WHERE username = ?");
@@ -269,7 +238,30 @@ class ServerThread implements Runnable {
             e.printStackTrace();
             return false;
         }
+    }
 
+    private void loggedInOptions() {
+        // add available actions private void loggedInOptions()
+        messages.add("what do you want to do?");
+        messages.add("1. Register a service");
+        messages.add("2. Get the passwords for a service");
+        messages.add("3. Remove a service");
+        send(messages);
+        String command = getUserInput();
+        System.out.println("[INFO] user wants to use service " + command);
+        switch (command) {
+            case "1":
+                // user wants to register a service
+                break;
+            case "2":
+                // user wants to retreive a service's accounts
+                break;
+            case "3":
+                // user wants to remove a service
+                break;
+            default:
+                break;
+        }
     }
 
     // convert digest to a string

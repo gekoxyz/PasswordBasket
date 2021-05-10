@@ -10,6 +10,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class Client {
     private Socket socket;
 
+    private boolean active = true;
     private OutputStream outputStream;
     private ObjectOutputStream objectOutputStream;
     private InputStream inputStream;
@@ -54,7 +55,7 @@ public class Client {
         byte[] vaultKey = null;
         List<String> messages = new ArrayList<String>();
         System.out.println("what do you want to do? (login/register)");
-        while (true) {
+        while (active) {
             try {
                 switch (command) {
                     case "default":

@@ -1,10 +1,14 @@
 import java.net.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
 import java.io.*;
 import java.util.*;
 
 import javax.crypto.Cipher;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class Client {
@@ -53,6 +57,7 @@ public class Client {
         String password = "";
         Console console = System.console();
         byte[] vaultKey = null;
+        byte[] loginPassword = null;
         List<String> messages = new ArrayList<String>();
         System.out.println("what do you want to do? (login/register)");
         while (active) {
@@ -71,13 +76,11 @@ public class Client {
                         // hashing vault key + pass to get the login password
                         // hash(vaultKey+pass)
                         // hash(hash(user+pass)+pass)
-                        messageDigest.update((username + password).getBytes());
-                        vaultKey = messageDigest.digest();
-                        System.out.println("[DEBUG] first digest: " + hexaToString(vaultKey));
-                        messageDigest.update((hexaToString(vaultKey) + password).getBytes());
-                        byte[] loginPassword = messageDigest.digest();
-                        System.out.println("[DEBUG] final digest: " + hexaToString(loginPassword));
-                        send(hexaToString(loginPassword));
+                        vaultKey = pbkdf2(password + username);
+                        System.out.println("[DEBUG] vault key: " + bytesToHexa(vaultKey));
+                        loginPassword = pbkdf2(bytesToHexa(vaultKey) + password);
+                        System.out.println("[DEBUG] auth key: " + bytesToHexa(loginPassword));
+                        send(bytesToHexa(loginPassword));
                         break;
                     case "service_password":
                         password = new String(console.readPassword());
@@ -116,6 +119,14 @@ public class Client {
                 e.printStackTrace();
             }
         }
+    }
+
+    // PBKDF2
+    public static byte[] pbkdf2(String password) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        String salt = "SALT";
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt.getBytes(), 10000, 256);
+        SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        return f.generateSecret(spec).getEncoded();
     }
 
     // send message to the server and reset the stream

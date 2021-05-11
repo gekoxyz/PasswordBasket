@@ -7,6 +7,7 @@ import java.io.*;
 import java.util.*;
 
 import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -20,7 +21,7 @@ public class Client {
     private InputStream inputStream;
     private ObjectInputStream objectInputStream;
 
-    MessageDigest messageDigest;
+    private Cipher cipher;
 
     public Client() {
         try {
@@ -36,9 +37,9 @@ public class Client {
             inputStream = socket.getInputStream();
             // create a DataInputStream so we can read data from it.
             objectInputStream = new ObjectInputStream(inputStream);
-            // define MessageDigest class algorithm
-            messageDigest = MessageDigest.getInstance("SHA-256");
-        } catch (IOException | NoSuchAlgorithmException e) {
+            // setto il cipher per fare aes ecb senza padding
+            cipher = Cipher.getInstance("AES");
+        } catch (IOException | NoSuchAlgorithmException | NoSuchPaddingException e) {
             System.out.println(e);
         }
     }
@@ -58,6 +59,7 @@ public class Client {
         Console console = System.console();
         byte[] vaultKey = null;
         byte[] loginPassword = null;
+        SecretKeySpec aesVaultKey = null;
         List<String> messages = new ArrayList<String>();
         System.out.println("what do you want to do? (login/register)");
         while (active) {
@@ -80,24 +82,21 @@ public class Client {
                         System.out.println("[DEBUG] vault key: " + bytesToHexa(vaultKey));
                         loginPassword = pbkdf2(bytesToHexa(vaultKey) + password);
                         System.out.println("[DEBUG] auth key: " + bytesToHexa(loginPassword));
+                        aesVaultKey = new SecretKeySpec(vaultKey, "AES");
+                        System.out.println("[VAULTKEY] " + bytesToHexa(vaultKey));
+                        System.out.println("[SECRETKEY] " + aesVaultKey);
                         send(bytesToHexa(loginPassword));
                         break;
                     case "service_password":
                         password = new String(console.readPassword());
-                        // get key and encrypt
-                        SecretKeySpec secretKey = new SecretKeySpec(vaultKey, "AES");
-                        System.out.println("[KEY] " + bytesToHexa(vaultKey));
-                        // setto il cipher per fare aes ecb senza padding
-                        Cipher cipher = Cipher.getInstance("AES");
                         // setto il cipher in modalita` encrypt
-                        cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+                        cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
                         String encryptedCipher = Base64.getEncoder()
                                 .encodeToString(cipher.doFinal(password.getBytes()));
                         // ENCRYPTED CIPHER
                         System.out.println(encryptedCipher);
-                        // send
                         send(encryptedCipher);
-                        // cipher.init(Cipher.DECRYPT_MODE, secretKey);
+                        // cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
                         // // DECRYPTED CIPHER
                         // System.out.println(new
                         // String(cipher.doFinal(Base64.getDecoder().decode(encryptedCipher))));

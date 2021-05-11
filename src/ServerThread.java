@@ -302,6 +302,16 @@ class ServerThread implements Runnable {
     }
 
     private void getServiceAccounts() {
+        messages.add("default");
+        messages.add("which service do you want to get the accounts of?");
+        send(messages);
+        String service = getUserInput();
+        // select * from users_accounts where service = ? and user = ?
+        try {
+            preparedStatement = dbConnection.prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     private void deleteServiceAccount() {

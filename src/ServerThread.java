@@ -278,6 +278,7 @@ class ServerThread implements Runnable {
         String serviceUsername = getUserInput();
         messages.add("service_password");
         messages.add("what's the password for " + serviceUsername + "@" + service + "?");
+        send(messages);
         String servicePassword = getUserInput();
         addServiceAccountQuery(service, serviceUsername, servicePassword);
     }
@@ -291,6 +292,8 @@ class ServerThread implements Runnable {
             preparedStatement.setString(2, serviceUsername);
             preparedStatement.setString(3, servicePassword);
             preparedStatement.setString(4, username);
+            System.out.println(
+                    "[INSERT] inserting " + service + " " + serviceUsername + " " + servicePassword + " " + username);
             rowsAffected = preparedStatement.executeUpdate();
         } catch (SQLException e) {
             System.out.println("[ERROR] error while entering the account in the database");

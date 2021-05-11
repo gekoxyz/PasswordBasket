@@ -96,8 +96,7 @@ public class Client {
                         // ENCRYPTED CIPHER
                         System.out.println(encryptedCipher);
                         // send
-                        objectOutputStream.writeObject(encryptedCipher);
-                        objectOutputStream.reset();
+                        send(encryptedCipher);
                         // cipher.init(Cipher.DECRYPT_MODE, secretKey);
                         // // DECRYPTED CIPHER
                         // System.out.println(new

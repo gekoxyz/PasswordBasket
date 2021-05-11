@@ -22,6 +22,7 @@ public class Client {
     private InputStream inputStream;
     private ObjectInputStream objectInputStream;
 
+    private List<String> messages = new ArrayList<String>();
     private Cipher cipher;
     private String salt = "";
 
@@ -62,9 +63,11 @@ public class Client {
         byte[] vaultKey = null;
         byte[] loginPassword = null;
         SecretKeySpec aesVaultKey = null;
-        List<String> messages = new ArrayList<String>();
-        System.out.println("what do you want to do? (login/register)");
-        while (active) {
+        getServerMessages();
+        for (String msg : messages) {
+            System.out.println(msg);
+        }
+        loop: while (active) {
             try {
                 switch (command) {
                     case "default":
@@ -97,16 +100,14 @@ public class Client {
                         // ENCRYPTED CIPHER
                         System.out.println(encryptedCipher);
                         send(encryptedCipher);
-                        // cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
-                        // // DECRYPTED CIPHER
-                        // System.out.println(new
-                        // String(cipher.doFinal(Base64.getDecoder().decode(encryptedCipher))));
                         break;
+                    case "no_operation":
+                        System.out.println("goodbye!");
+                        break loop;
                     default:
                         break;
                 }
-                System.out.println("[DEBUG] waiting for message " + socket);
-                messages = (List<String>) objectInputStream.readObject();
+                getServerMessages();
                 switch (messages.get(0)) {
                     case "salt":
                         messages.remove(0);
@@ -116,13 +117,23 @@ public class Client {
                     case "service_decrypt":
                         // decrypt
                         messages.remove(0);
-                        int i = 1;
-                        cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
-                        for (String msg : messages) {
-                            if (i % 2 == 0) {
-                                System.out.print(msg + " -> ");
+
+                        // setto il cipher in modalita` decrypt
+
+                        // if (i % 2 == 0) {
+                        // System.out.print(msg + " -> ");
+                        // } else {
+                        // // DECRYPTED CIPHER
+                        // cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
+                        // System.out.println(cipher.doFinal(hexToBytes(msg)));
+                        // }
+
+                        for (int j = 0; j < messages.size(); j++) {
+                            if (!messages.get(0).equals("end_decrypt")) {
+                                System.out.println(messages.remove(0));
                             } else {
-                                System.out.println(cipher.doFinal(hexToBytes(msg)));
+                                messages.remove("end_decrypt");
+                                break;
                             }
                         }
                         break;
@@ -130,7 +141,6 @@ public class Client {
                         break;
                 }
                 command = messages.remove(0);
-                System.out.println("Received [" + (messages.size()) + "] messages from: " + socket);
                 for (String msg : messages) {
                     System.out.println(msg);
                 }
@@ -156,6 +166,17 @@ public class Client {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private List<String> getServerMessages() {
+        try {
+            System.out.println("[DEBUG] waiting for message " + socket);
+            messages = (List<String>) objectInputStream.readObject();
+            System.out.println("Received [" + (messages.size()) + "] messages from: " + socket);
+        } catch (ClassNotFoundException | IOException e) {
+            System.out.println("[ERROR] error while receiving messages from the server " + e);
+        }
+        return messages;
     }
 
     private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);

@@ -36,7 +36,6 @@ class ServerThread implements Runnable {
     private String hashedPassword = "";
     private boolean invalidUsername;
     private String storedPassword = "";
-    private PreparedStatement preparedStatement;
 
     public ServerThread(Socket richiestaClient) {
         try {
@@ -66,15 +65,33 @@ class ServerThread implements Runnable {
 
     public void run() {
         // conversazione lato server
+        String command;
         while (active) {
-            String command = getUserInput();
+            messages.add("== Cosa vuoi fare? ==");
+            messages.add("1. Login");
+            messages.add("2. Register");
+            messages.add("3. Credits");
+            messages.add("4. Exit");
+            send(messages);
+            command = getUserInput();
             // -- SELECT CASE FOR USER LOGIN/REGISTER --
             switch (command) {
-                case "login":
+                case "1":
                     login(dbConnection);
+                    messages.add("default");
                     break;
-                case "register":
+                case "2":
                     register(dbConnection);
+                    messages.add("default");
+                    break;
+                case "3":
+                    messages.add("default");
+                    messages.add("function not yet implemented");
+                    break;
+                case "4":
+                    messages.add("no_operation");
+                    send(messages);
+                    active = false;
                     break;
                 default:
                     break;
@@ -301,7 +318,7 @@ class ServerThread implements Runnable {
     private void addServiceAccountQuery(String service, String serviceUsername, String servicePassword) {
         int rowsAffected = 0;
         try {
-            preparedStatement = dbConnection.prepareStatement(
+            PreparedStatement preparedStatement = dbConnection.prepareStatement(
                     "INSERT INTO users_accounts (service, service_username, service_password, user) VALUES (?, ?, ?, ?)");
             preparedStatement.setString(1, service);
             preparedStatement.setString(2, serviceUsername);
@@ -323,26 +340,28 @@ class ServerThread implements Runnable {
         String service = getUserInput();
         // select * from users_accounts where service = ? and user = ?
         try {
-            preparedStatement = dbConnection
+            PreparedStatement preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
             preparedStatement.setString(1, service);
             preparedStatement.setString(2, username);
-            System.out.println("[SELECT] getting " + service + "@" + username);
+            System.out.println(
+                    "SELECT * FROM users_accounts WHERE service = '" + service + "' AND user = '" + username + "'");
             ResultSet rs = preparedStatement.executeQuery();
-            if (!rs.next()) {
-                messages.add("default");
-                messages.add("You have no accounts for " + service + " :(");
-                send(messages);
-            } else {
-                messages.add("service_decrypt");
-                while (rs.next()) {
-                    messages.add(rs.getString("service_username"));
-                    messages.add(rs.getString("service_password"));
-                }
-                send(messages);
+            System.out.println("[INFO] got results. printing to messages");
+            messages.add("service_decrypt");
+            while (rs.next()) {
+                String serviceUsername = rs.getString("service_username");
+                String servicePassword = rs.getString("service_password");
+                messages.add(serviceUsername);
+                messages.add(servicePassword);
+                System.out.println("[INFO] sending to user ");
+                System.out.println("username:" + serviceUsername);
+                System.out.println("password:" + servicePassword);
             }
+            messages.add("end_decrypt");
+            messages.add("default");
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("[ERROR] exception while getting service account " + e);
         }
     }
 

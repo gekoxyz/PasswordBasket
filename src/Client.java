@@ -1,4 +1,5 @@
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
@@ -22,6 +23,7 @@ public class Client {
     private ObjectInputStream objectInputStream;
 
     private Cipher cipher;
+    private String salt = "";
 
     public Client() {
         try {
@@ -78,21 +80,20 @@ public class Client {
                         // hashing vault key + pass to get the login password
                         // hash(vaultKey+pass)
                         // hash(hash(user+pass)+pass)
-                        vaultKey = pbkdf2(password + username);
-                        System.out.println("[DEBUG] vault key: " + bytesToHexa(vaultKey));
-                        loginPassword = pbkdf2(bytesToHexa(vaultKey) + password);
-                        System.out.println("[DEBUG] auth key: " + bytesToHexa(loginPassword));
+                        vaultKey = pbkdf2(password + username, salt);
+                        System.out.println("[DEBUG] vault key: " + bytesToHex(vaultKey));
+                        loginPassword = pbkdf2(bytesToHex(vaultKey) + password, salt);
+                        System.out.println("[DEBUG] auth key: " + bytesToHex(loginPassword));
                         aesVaultKey = new SecretKeySpec(vaultKey, "AES");
-                        System.out.println("[VAULTKEY] " + bytesToHexa(vaultKey));
+                        System.out.println("[VAULTKEY] " + bytesToHex(vaultKey));
                         System.out.println("[SECRETKEY] " + aesVaultKey);
-                        send(bytesToHexa(loginPassword));
+                        send(bytesToHex(loginPassword));
                         break;
                     case "service_password":
                         password = new String(console.readPassword());
                         // setto il cipher in modalita` encrypt
                         cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
-                        String encryptedCipher = Base64.getEncoder()
-                                .encodeToString(cipher.doFinal(password.getBytes()));
+                        String encryptedCipher = bytesToHex(cipher.doFinal(password.getBytes()));
                         // ENCRYPTED CIPHER
                         System.out.println(encryptedCipher);
                         send(encryptedCipher);
@@ -106,9 +107,13 @@ public class Client {
                 }
                 System.out.println("[DEBUG] waiting for message " + socket);
                 messages = (List<String>) objectInputStream.readObject();
-                System.out.println("Received [" + (messages.size() - 1) + "] messages from: " + socket);
-                command = messages.get(0);
-                messages.remove(0);
+                if (messages.get(0).equals("salt")) {
+                    messages.remove(0);
+                    salt = messages.remove(0);
+                    System.out.println("GOT THE SALT " + salt);
+                }
+                command = messages.remove(0);
+                System.out.println("Received [" + (messages.size()) + "] messages from: " + socket);
                 for (String msg : messages) {
                     System.out.println(msg);
                 }
@@ -120,8 +125,7 @@ public class Client {
     }
 
     // PBKDF2
-    public static byte[] pbkdf2(String password) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        String salt = "SALT";
+    public static byte[] pbkdf2(String password, String salt) throws NoSuchAlgorithmException, InvalidKeySpecException {
         KeySpec spec = new PBEKeySpec(password.toCharArray(), salt.getBytes(), 10000, 256);
         SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         return f.generateSecret(spec).getEncoded();
@@ -137,25 +141,25 @@ public class Client {
         }
     }
 
-    // Convert digest to a string
-    private String hexaToString(byte[] digest) {
-        StringBuffer hexString = new StringBuffer();
-        for (int i = 0; i < digest.length; i++) {
-            if ((0xff & digest[i]) < 0x10) {
-                hexString.append("0" + Integer.toHexString((0xFF & digest[i])));
-            } else {
-                hexString.append(Integer.toHexString(0xFF & digest[i]));
-            }
+    private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+
+    public static String bytesToHex(byte[] bytes) {
+        byte[] hexChars = new byte[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
         }
-        return hexString.toString();
+        return new String(hexChars, StandardCharsets.UTF_8);
     }
 
-    // Convert byte array to hexadecimal
-    private String bytesToHexa(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
+    public static byte[] hexToBytes(String str) {
+        byte[] val = new byte[str.length() / 2];
+        for (int i = 0; i < val.length; i++) {
+            int index = i * 2;
+            int j = Integer.parseInt(str.substring(index, index + 2), 16);
+            val[i] = (byte) j;
         }
-        return sb.toString();
+        return val;
     }
 }

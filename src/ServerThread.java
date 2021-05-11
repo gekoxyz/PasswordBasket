@@ -1,4 +1,5 @@
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -8,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.io.IOException;
 import java.io.InputStream;
@@ -134,6 +136,9 @@ class ServerThread implements Runnable {
             } else {
                 System.out.println("[DEBUG] username does not exists, available for the registration");
                 usernameToRegister = username;
+                messages.add("salt");
+                salt = bytesToHex(generateSalt());
+                messages.add(salt);
                 messages.add("password");
                 messages.add("username is not taken yet :)");
                 invalidUsername = false;
@@ -148,9 +153,8 @@ class ServerThread implements Runnable {
         System.out.println("[DEBUG] got password request");
         // hashing the password, generating a random salt and saving it to the database
         // to finally secure login credentials
-        salt = hexaToString(generateSalt());
         messageDigest.update((password + salt).getBytes());
-        hashedPassword = hexaToString(messageDigest.digest());
+        hashedPassword = bytesToHex(messageDigest.digest());
         try {
             // preparing insert query and executing it
             PreparedStatement preparedStatement = dbConnection
@@ -186,6 +190,8 @@ class ServerThread implements Runnable {
                 messages.add("input username is not valid");
             } else {
                 System.out.println("[DEBUG] username exists, valid operation");
+                messages.add("salt");
+                messages.add(salt);
                 messages.add("password");
                 invalidUsername = false;
             }
@@ -199,7 +205,7 @@ class ServerThread implements Runnable {
             password = getUserInput();
             System.out.println("[DEBUG] password received");
             messageDigest.update((password + salt).getBytes());
-            hashedPassword = hexaToString(messageDigest.digest());
+            hashedPassword = bytesToHex(messageDigest.digest());
             System.out.println("[DEBUG] password validation");
             if (storedPassword.equals(hashedPassword)) {
                 // login is valid
@@ -308,7 +314,8 @@ class ServerThread implements Runnable {
         String service = getUserInput();
         // select * from users_accounts where service = ? and user = ?
         try {
-            preparedStatement = dbConnection.prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
+            preparedStatement = dbConnection
+                    .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -317,24 +324,33 @@ class ServerThread implements Runnable {
     private void deleteServiceAccount() {
     }
 
-    // convert digest to a string
-    private String hexaToString(byte[] digest) {
-        StringBuffer hexString = new StringBuffer();
-        for (int i = 0; i < digest.length; i++) {
-            if ((0xff & digest[i]) < 0x10) {
-                hexString.append("0" + Integer.toHexString((0xFF & digest[i])));
-            } else {
-                hexString.append(Integer.toHexString(0xFF & digest[i]));
-            }
-        }
-        return hexString.toString();
-    }
-
     // generate random salt for password storing
     private byte[] generateSalt() {
         SecureRandom random = new SecureRandom();
         byte bytes[] = new byte[8];
         random.nextBytes(bytes);
         return bytes;
+    }
+
+    private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+
+    public static String bytesToHex(byte[] bytes) {
+        byte[] hexChars = new byte[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+        }
+        return new String(hexChars, StandardCharsets.UTF_8);
+    }
+
+    public static byte[] hexToBytes(String str) {
+        byte[] val = new byte[str.length() / 2];
+        for (int i = 0; i < val.length; i++) {
+            int index = i * 2;
+            int j = Integer.parseInt(str.substring(index, index + 2), 16);
+            val[i] = (byte) j;
+        }
+        return val;
     }
 }

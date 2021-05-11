@@ -247,29 +247,35 @@ class ServerThread implements Runnable {
     }
 
     private void loggedInOptions() {
-        // add available actions private void loggedInOptions()
-        messages.add("what do you want to do?");
-        messages.add("1. Register a service");
-        messages.add("2. Get the passwords for a service");
-        messages.add("3. Remove a service");
-        send(messages);
-        String command = getUserInput();
-        System.out.println("[INFO] user wants to use service " + command);
-        switch (command) {
-            case "1":
-                // user wants to register a service
-                addServiceAccount();
-                break;
-            case "2":
-                // user wants to retreive a service's accounts
-                getServiceAccounts();
-                break;
-            case "3":
-                // user wants to remove a service
-                deleteServiceAccount();
-                break;
-            default:
-                break;
+        boolean activeLogin = true;
+        while (activeLogin) {
+            messages.add("what do you want to do?");
+            messages.add("1. Register a service");
+            messages.add("2. Get the passwords for a service");
+            messages.add("3. Remove a service");
+            messages.add("4. Logout");
+            send(messages);
+            String command = getUserInput();
+            System.out.println("[INFO] user wants to use service " + command);
+            switch (command) {
+                case "1":
+                    // user wants to register a service
+                    addServiceAccount();
+                    break;
+                case "2":
+                    // user wants to retreive a service's accounts
+                    getServiceAccounts();
+                    break;
+                case "3":
+                    // user wants to remove a service
+                    deleteServiceAccount();
+                    break;
+                case "4":
+                    activeLogin = false;
+                    break;
+                default:
+                    break;
+            }
         }
     }
 
@@ -287,6 +293,9 @@ class ServerThread implements Runnable {
         send(messages);
         String servicePassword = getUserInput();
         addServiceAccountQuery(service, serviceUsername, servicePassword);
+        messages.add("default");
+        messages.add("account aggiunto con successo");
+        send(messages);
     }
 
     private void addServiceAccountQuery(String service, String serviceUsername, String servicePassword) {
@@ -316,6 +325,22 @@ class ServerThread implements Runnable {
         try {
             preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
+            preparedStatement.setString(1, service);
+            preparedStatement.setString(2, username);
+            System.out.println("[SELECT] getting " + service + "@" + username);
+            ResultSet rs = preparedStatement.executeQuery();
+            if (!rs.next()) {
+                messages.add("default");
+                messages.add("You have no accounts for " + service + " :(");
+                send(messages);
+            } else {
+                messages.add("service_decrypt");
+                while (rs.next()) {
+                    messages.add(rs.getString("service_username"));
+                    messages.add(rs.getString("service_password"));
+                }
+                send(messages);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }

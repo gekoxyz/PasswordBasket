@@ -107,10 +107,27 @@ public class Client {
                 }
                 System.out.println("[DEBUG] waiting for message " + socket);
                 messages = (List<String>) objectInputStream.readObject();
-                if (messages.get(0).equals("salt")) {
-                    messages.remove(0);
-                    salt = messages.remove(0);
-                    System.out.println("GOT THE SALT " + salt);
+                switch (messages.get(0)) {
+                    case "salt":
+                        messages.remove(0);
+                        salt = messages.remove(0);
+                        System.out.println("GOT THE SALT " + salt);
+                        break;
+                    case "service_decrypt":
+                        // decrypt
+                        messages.remove(0);
+                        int i = 1;
+                        cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
+                        for (String msg : messages) {
+                            if (i % 2 == 0) {
+                                System.out.print(msg + " -> ");
+                            } else {
+                                System.out.println(cipher.doFinal(hexToBytes(msg)));
+                            }
+                        }
+                        break;
+                    default:
+                        break;
                 }
                 command = messages.remove(0);
                 System.out.println("Received [" + (messages.size()) + "] messages from: " + socket);

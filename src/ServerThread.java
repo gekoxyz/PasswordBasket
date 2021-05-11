@@ -34,7 +34,7 @@ class ServerThread implements Runnable {
     private String hashedPassword = "";
     private boolean invalidUsername;
     private String storedPassword = "";
-    private String service = "";
+    private PreparedStatement preparedStatement;
 
     public ServerThread(Socket richiestaClient) {
         try {
@@ -252,16 +252,56 @@ class ServerThread implements Runnable {
         switch (command) {
             case "1":
                 // user wants to register a service
+                addServiceAccount();
                 break;
             case "2":
                 // user wants to retreive a service's accounts
+                getServiceAccounts();
                 break;
             case "3":
                 // user wants to remove a service
+                deleteServiceAccount();
                 break;
             default:
                 break;
         }
+    }
+
+    private void addServiceAccount() {
+        messages.add("default");
+        messages.add("what service do you want to add?");
+        send(messages);
+        String service = getUserInput();
+        messages.add("default");
+        messages.add("what's the username for " + service + "?");
+        send(messages);
+        String serviceUsername = getUserInput();
+        messages.add("service_password");
+        messages.add("what's the password for " + serviceUsername + "@" + service + "?");
+        String servicePassword = getUserInput();
+        addServiceAccountQuery(service, serviceUsername, servicePassword);
+    }
+
+    private void addServiceAccountQuery(String service, String serviceUsername, String servicePassword) {
+        int rowsAffected = 0;
+        try {
+            preparedStatement = dbConnection.prepareStatement(
+                    "INSERT INTO users_accounts (service, service_username, service_password, user) VALUES (?, ?, ?, ?)");
+            preparedStatement.setString(1, service);
+            preparedStatement.setString(2, serviceUsername);
+            preparedStatement.setString(3, servicePassword);
+            preparedStatement.setString(4, username);
+            rowsAffected = preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            System.out.println("[ERROR] error while entering the account in the database");
+        }
+        System.out.println("[DEBUG] add service query successful. rows affected:" + rowsAffected);
+    }
+
+    private void getServiceAccounts() {
+    }
+
+    private void deleteServiceAccount() {
     }
 
     // convert digest to a string

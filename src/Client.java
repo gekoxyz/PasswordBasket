@@ -55,7 +55,6 @@ public class Client {
     private void run() {
         // conversazione lato client
         Scanner scan = new Scanner(System.in);
-        String command = "default";
         String message = "";
         String username = "";
         String password = "";
@@ -63,13 +62,53 @@ public class Client {
         byte[] vaultKey = null;
         byte[] loginPassword = null;
         SecretKeySpec aesVaultKey = null;
-        getServerMessages();
-        for (String msg : messages) {
-            System.out.println(msg);
-        }
-        loop: while (active) {
+        String preamble = "";
+        String inputModifier = "";
+        while (active) {
+            getServerMessages();
+            System.out.println(messages);
+            int headerLength = Integer.parseInt(messages.remove(0));
+            headerLength--;
+            inputModifier = messages.remove(headerLength);
+            headerLength--;
+            if (headerLength >= 0) {
+                preamble = messages.remove(0);
+            }
+            switch (preamble) {
+                case "salt":
+                    salt = messages.remove(0);
+                    System.out.println("GOT THE SALT " + salt);
+                    break;
+                case "service_decrypt":
+                    // decrypt
+                    // setto il cipher in modalita` decrypt
+
+                    // if (i % 2 == 0) {
+                    // System.out.print(msg + " -> ");
+                    // } else {
+                    // // DECRYPTED CIPHER
+                    // cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
+                    // System.out.println(cipher.doFinal(hexToBytes(msg)));
+                    // }
+
+                    for (int j = 0; j < messages.size(); j++) {
+                        if (!messages.get(0).equals("end_decrypt")) {
+                            System.out.println(messages.remove(0));
+                        } else {
+                            messages.remove("end_decrypt");
+                            break;
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+            for (String msg : messages) {
+                System.out.println(msg);
+            }
+            messages.clear();
             try {
-                switch (command) {
+                switch (inputModifier) {
                     case "default":
                         message = scan.nextLine();
                         send(message);
@@ -103,51 +142,15 @@ public class Client {
                         break;
                     case "no_operation":
                         System.out.println("goodbye!");
-                        break loop;
-                    default:
-                        break;
-                }
-                getServerMessages();
-                switch (messages.get(0)) {
-                    case "salt":
-                        messages.remove(0);
-                        salt = messages.remove(0);
-                        System.out.println("GOT THE SALT " + salt);
-                        break;
-                    case "service_decrypt":
-                        // decrypt
-                        messages.remove(0);
-
-                        // setto il cipher in modalita` decrypt
-
-                        // if (i % 2 == 0) {
-                        // System.out.print(msg + " -> ");
-                        // } else {
-                        // // DECRYPTED CIPHER
-                        // cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
-                        // System.out.println(cipher.doFinal(hexToBytes(msg)));
-                        // }
-
-                        for (int j = 0; j < messages.size(); j++) {
-                            if (!messages.get(0).equals("end_decrypt")) {
-                                System.out.println(messages.remove(0));
-                            } else {
-                                messages.remove("end_decrypt");
-                                break;
-                            }
-                        }
                         break;
                     default:
                         break;
                 }
-                command = messages.remove(0);
-                for (String msg : messages) {
-                    System.out.println(msg);
-                }
-                messages.clear();
             } catch (Exception e) {
-                e.printStackTrace();
+                System.out.println("EXCEPTION IO");
             }
+            preamble = "";
+            inputModifier = "";
         }
     }
 

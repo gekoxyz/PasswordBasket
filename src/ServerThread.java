@@ -10,7 +10,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -27,7 +29,9 @@ class ServerThread implements Runnable {
     private InputStream inputStream;
     private ObjectInputStream objectInputStream;
 
-    private List<String> messages = new ArrayList<String>();
+    private List<String> payload = new ArrayList<String>();
+    private List<String> header = new ArrayList<String>();
+    private int headerLength = 0;
     private MessageDigest messageDigest;
 
     private String username = "";
@@ -67,30 +71,28 @@ class ServerThread implements Runnable {
         // conversazione lato server
         String command;
         while (active) {
-            messages.add("== Cosa vuoi fare? ==");
-            messages.add("1. Login");
-            messages.add("2. Register");
-            messages.add("3. Credits");
-            messages.add("4. Exit");
-            send(messages);
+            addHeader("default");
+            payload.add("== Cosa vuoi fare? ==");
+            payload.add("1. Login");
+            payload.add("2. Register");
+            payload.add("3. Credits");
+            payload.add("4. Exit");
+            send();
             command = getUserInput();
             // -- SELECT CASE FOR USER LOGIN/REGISTER --
             switch (command) {
                 case "1":
                     login(dbConnection);
-                    messages.add("default");
                     break;
                 case "2":
                     register(dbConnection);
-                    messages.add("default");
                     break;
                 case "3":
-                    messages.add("default");
-                    messages.add("function not yet implemented");
+                    payload.add("function not yet implemented");
                     break;
                 case "4":
-                    messages.add("no_operation");
-                    send(messages);
+                    addHeader("no_operation");
+                    send();
                     active = false;
                     break;
                 default:
@@ -114,12 +116,17 @@ class ServerThread implements Runnable {
     }
 
     // resetto la stream, scrivo l'oggetto e pulisco la lista di messaggi
-    private void send(List<String> messagesToSend) {
+    private void send() {
         System.out.println("[DEBUG] Sending data to " + socket);
         try {
-            objectOutputStream.writeObject(messagesToSend);
+            header.add(0, Integer.toString(headerLength));
+            header.addAll(payload);
+            System.out.println(header);
+            objectOutputStream.writeObject(header);
             objectOutputStream.reset();
-            messages.clear();
+            payload.clear();
+            header.clear();
+            headerLength = 0;
         } catch (IOException e) {
             System.out.println("[ERROR] error occurred while sending message");
         }
@@ -138,32 +145,32 @@ class ServerThread implements Runnable {
     private void register(Connection dbConnection) {
         String usernameToRegister = "";
         System.out.println("[DEBUG] client selected register " + socket);
-        messages.add("username");
-        messages.add("You selected register");
+        addHeader("username");
+        payload.add("You selected register");
         invalidUsername = true;
         while (invalidUsername) {
-            messages.add("input the username you want");
-            send(messages);
+            payload.add("input the username you want");
+            send();
             // getting username
             boolean usernameExists = checkUsernameExistence(dbConnection);
             if (usernameExists) {
                 System.out.println("[DEBUG] username exists, not available for the registration");
-                messages.add("username");
-                messages.add("sorry, username is taken :(");
+                addHeader("username");
+                payload.add("sorry, username is taken :(");
             } else {
                 System.out.println("[DEBUG] username does not exists, available for the registration");
                 usernameToRegister = username;
-                messages.add("salt");
+                addHeader("salt");
                 salt = bytesToHex(generateSalt());
-                messages.add(salt);
-                messages.add("password");
-                messages.add("username is not taken yet :)");
+                addHeader(salt);
+                addHeader("password");
+                payload.add("username is not taken yet :)");
                 invalidUsername = false;
             }
         }
         System.out.println("[DEBUG] username not taken, sending result to " + socket);
-        messages.add("Input the password");
-        send(messages);
+        payload.add("Input the password");
+        send();
         // get password
         // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
         password = getUserInput();
@@ -185,31 +192,30 @@ class ServerThread implements Runnable {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        messages.add("default");
-        messages.add("registration completed!");
-        messages.add("type login to authenticate");
-        send(messages);
+        addHeader("default");
+        payload.add("registration completed!");
+        payload.add("type 1 to authenticate");
     }
 
     private void login(Connection dbConnection) {
         System.out.println("[DEBUG] client selected login " + socket);
-        messages.add("username");
-        messages.add("you selected login");
+        addHeader("username");
+        payload.add("you selected login");
         invalidUsername = true;
         while (invalidUsername) {
-            messages.add("input your username");
-            send(messages);
+            payload.add("input your username");
+            send();
             // getting username
             boolean usernameExists = checkUsernameExistence(dbConnection);
             if (!usernameExists) {
                 System.out.println("[DEBUG] username doesn't exist, invalid operation");
-                messages.add("username");
-                messages.add("input username is not valid");
+                addHeader("username");
+                payload.add("input username is not valid");
             } else {
                 System.out.println("[DEBUG] username exists, valid operation");
-                messages.add("salt");
-                messages.add(salt);
-                messages.add("password");
+                addHeader("salt");
+                addHeader(salt);
+                addHeader("password");
                 invalidUsername = false;
             }
         }
@@ -217,27 +223,29 @@ class ServerThread implements Runnable {
         boolean invalidPassword = true;
         while (invalidPassword) {
             System.out.println("[DEBUG] asking for the password");
-            messages.add("input your password");
-            send(messages);
+            payload.add("input your password");
+            send();
             password = getUserInput();
             System.out.println("[DEBUG] password received");
             messageDigest.update((password + salt).getBytes());
             hashedPassword = bytesToHex(messageDigest.digest());
             System.out.println("[DEBUG] password validation");
+            System.out.println("stored password: " + storedPassword);
+            System.out.println("hashed password: " + hashedPassword);
             if (storedPassword.equals(hashedPassword)) {
                 // login is valid
                 // messages.add(new Message("valid password!"));
                 System.out.println("[DEBUG] valid password");
-                messages.add("default");
+                addHeader("default");
                 invalidPassword = false;
             } else {
                 // password invalid
                 System.out.println("[DEBUG] invalid password");
-                messages.add("password");
-                messages.add("invalid password!");
+                addHeader("password");
+                payload.add("invalid password!");
             }
         }
-        messages.add("successfully logged in!");
+        payload.add("successfully logged in!");
         loggedInOptions();
     }
 
@@ -266,12 +274,12 @@ class ServerThread implements Runnable {
     private void loggedInOptions() {
         boolean activeLogin = true;
         while (activeLogin) {
-            messages.add("what do you want to do?");
-            messages.add("1. Register a service");
-            messages.add("2. Get the passwords for a service");
-            messages.add("3. Remove a service");
-            messages.add("4. Logout");
-            send(messages);
+            payload.add("what do you want to do?");
+            payload.add("1. Register a service");
+            payload.add("2. Get the passwords for a service");
+            payload.add("3. Remove a service");
+            payload.add("4. Logout");
+            send();
             String command = getUserInput();
             System.out.println("[INFO] user wants to use service " + command);
             switch (command) {
@@ -297,22 +305,22 @@ class ServerThread implements Runnable {
     }
 
     private void addServiceAccount() {
-        messages.add("default");
-        messages.add("what service do you want to add?");
-        send(messages);
+        addHeader("default");
+        payload.add("what service do you want to add?");
+        send();
         String service = getUserInput();
-        messages.add("default");
-        messages.add("what's the username for " + service + "?");
-        send(messages);
+        addHeader("default");
+        payload.add("what's the username for " + service + "?");
+        send();
         String serviceUsername = getUserInput();
-        messages.add("service_password");
-        messages.add("what's the password for " + serviceUsername + "@" + service + "?");
-        send(messages);
+        addHeader("service_password");
+        payload.add("what's the password for " + serviceUsername + "@" + service + "?");
+        send();
         String servicePassword = getUserInput();
         addServiceAccountQuery(service, serviceUsername, servicePassword);
-        messages.add("default");
-        messages.add("account aggiunto con successo");
-        send(messages);
+        addHeader("default");
+        payload.add("account aggiunto con successo");
+        send();
     }
 
     private void addServiceAccountQuery(String service, String serviceUsername, String servicePassword) {
@@ -334,9 +342,9 @@ class ServerThread implements Runnable {
     }
 
     private void getServiceAccounts() {
-        messages.add("default");
-        messages.add("which service do you want to get the accounts of?");
-        send(messages);
+        addHeader("default");
+        payload.add("which service do you want to get the accounts of?");
+        send();
         String service = getUserInput();
         // select * from users_accounts where service = ? and user = ?
         try {
@@ -348,18 +356,18 @@ class ServerThread implements Runnable {
                     "SELECT * FROM users_accounts WHERE service = '" + service + "' AND user = '" + username + "'");
             ResultSet rs = preparedStatement.executeQuery();
             System.out.println("[INFO] got results. printing to messages");
-            messages.add("service_decrypt");
+            addHeader("service_decrypt");
             while (rs.next()) {
                 String serviceUsername = rs.getString("service_username");
                 String servicePassword = rs.getString("service_password");
-                messages.add(serviceUsername);
-                messages.add(servicePassword);
+                payload.add(serviceUsername);
+                payload.add(servicePassword);
                 System.out.println("[INFO] sending to user ");
                 System.out.println("username:" + serviceUsername);
                 System.out.println("password:" + servicePassword);
             }
-            messages.add("end_decrypt");
-            messages.add("default");
+            payload.add("end_decrypt");
+            addHeader("default");
         } catch (SQLException e) {
             System.out.println("[ERROR] exception while getting service account " + e);
         }
@@ -374,6 +382,19 @@ class ServerThread implements Runnable {
         byte bytes[] = new byte[8];
         random.nextBytes(bytes);
         return bytes;
+    }
+
+    private static final Set<String> PREAMBLES = Set.of("salt", "service_decrypt");
+    // private static final Set<String> INPUT_MODIFIERS = Set.of("default",
+    // "username", "password", "service_password");
+
+    private void addHeader(String option) {
+        headerLength++;
+        if (PREAMBLES.contains(option)) {
+            header.add(0, option);
+        } else {
+            header.add(option);
+        }
     }
 
     private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);

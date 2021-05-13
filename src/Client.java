@@ -1,13 +1,15 @@
 import java.net.*;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.io.*;
 import java.util.*;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -66,7 +68,6 @@ public class Client {
         String inputModifier = "";
         while (active) {
             getServerMessages();
-            System.out.println(messages);
             int headerLength = Integer.parseInt(messages.remove(0));
             headerLength--;
             inputModifier = messages.remove(headerLength);
@@ -82,22 +83,24 @@ public class Client {
                 case "service_decrypt":
                     // decrypt
                     // setto il cipher in modalita` decrypt
-
-                    // if (i % 2 == 0) {
-                    // System.out.print(msg + " -> ");
-                    // } else {
-                    // // DECRYPTED CIPHER
-                    // cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
-                    // System.out.println(cipher.doFinal(hexToBytes(msg)));
-                    // }
-
-                    for (int j = 0; j < messages.size(); j++) {
-                        if (!messages.get(0).equals("end_decrypt")) {
-                            System.out.println(messages.remove(0));
-                        } else {
-                            messages.remove("end_decrypt");
-                            break;
+                    try {
+                        cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
+                    } catch (InvalidKeyException e1) {
+                        System.out.println("invalid decryption initialization");
+                    }
+                    int i = 0;
+                    try {
+                        while (!messages.get(0).equals("end_decrypt")) {
+                            if (i % 2 == 0) {
+                                System.out.print(messages.remove(0) + " -> ");
+                            } else {
+                                System.out.println(new String(cipher.doFinal(hexToBytes(messages.remove(0)))));
+                            }
+                            i++;
                         }
+                        messages.remove(0);
+                    } catch (IllegalBlockSizeException | BadPaddingException e) {
+                        System.out.println("invalid decryption" + e);
                     }
                     break;
                 default:
@@ -127,7 +130,6 @@ public class Client {
                         loginPassword = pbkdf2(bytesToHex(vaultKey) + password, salt);
                         System.out.println("[DEBUG] auth key: " + bytesToHex(loginPassword));
                         aesVaultKey = new SecretKeySpec(vaultKey, "AES");
-                        System.out.println("[VAULTKEY] " + bytesToHex(vaultKey));
                         System.out.println("[SECRETKEY] " + aesVaultKey);
                         send(bytesToHex(loginPassword));
                         break;

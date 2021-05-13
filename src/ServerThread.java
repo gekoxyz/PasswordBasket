@@ -9,8 +9,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.io.IOException;
@@ -43,6 +41,7 @@ class ServerThread implements Runnable {
 
     public ServerThread(Socket richiestaClient) {
         try {
+            // aggiungere messaggi cosi` formattati: 2015-11-10 15:26:57 4348 [Note] Server socket created on IP: '::'.
             socket = richiestaClient;
             System.out.println("[INFO] " + socket + " connected ");
             dbConnection = connectToDatabase();
@@ -121,7 +120,7 @@ class ServerThread implements Runnable {
         try {
             header.add(0, Integer.toString(headerLength));
             header.addAll(payload);
-            System.out.println(header);
+            // System.out.println(header);
             objectOutputStream.writeObject(header);
             objectOutputStream.reset();
             payload.clear();
@@ -320,7 +319,6 @@ class ServerThread implements Runnable {
         addServiceAccountQuery(service, serviceUsername, servicePassword);
         addHeader("default");
         payload.add("account aggiunto con successo");
-        send();
     }
 
     private void addServiceAccountQuery(String service, String serviceUsername, String servicePassword) {

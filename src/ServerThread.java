@@ -41,7 +41,8 @@ class ServerThread implements Runnable {
 
     public ServerThread(Socket richiestaClient) {
         try {
-            // aggiungere messaggi cosi` formattati: 2015-11-10 15:26:57 4348 [Note] Server socket created on IP: '::'.
+            // aggiungere messaggi cosi` formattati: 2015-11-10 15:26:57 4348 [Note] Server
+            // socket created on IP: '::'.
             socket = richiestaClient;
             System.out.println("[INFO] " + socket + " connected ");
             dbConnection = connectToDatabase();
@@ -372,6 +373,49 @@ class ServerThread implements Runnable {
     }
 
     private void deleteServiceAccount() {
+        int rowsAffected = 0;
+        addHeader("default");
+        payload.add("what service do you want to delete the account of?");
+        send();
+        String service = getUserInput();
+        PreparedStatement preparedStatement;
+        try {
+            preparedStatement = dbConnection
+                    .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
+            preparedStatement.setString(1, service);
+            preparedStatement.setString(2, username);
+            ResultSet rs = preparedStatement.executeQuery();
+            System.out.println("[INFO] got results. printing to messages");
+            addHeader("default");
+            payload.add("what " + service + " account do you want to remove? (input account username)");
+            while (rs.next()) {
+                String serviceUsername = rs.getString("service_username");
+                payload.add(serviceUsername);
+                System.out.println("[INFO] sending to user ");
+                System.out.println("username:" + serviceUsername + "@" + service);
+            }
+        } catch (SQLException e) {
+            System.out.println("[ERROR] error while fetching accounts for service for user " + e);
+        }
+        send();
+        String accountToRemove = getUserInput();
+        System.out.println("[INFO] user wants to remove " + accountToRemove);
+        try {
+            preparedStatement = dbConnection.prepareStatement(
+                    "DELETE FROM users_accounts WHERE service = ? AND service_username = ? AND user = ?");
+            preparedStatement.setString(1, service);
+            preparedStatement.setString(2, accountToRemove);
+            preparedStatement.setString(3, username);
+            rowsAffected = preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            System.out.println("[ERROR] error while deleting account for user " + e);
+        }
+        /*
+         * DELETE FROM users_accounts WHERE service = ? AND service_username = ?
+         */
+        System.out.println("[INFO] rows affected: " + rowsAffected);
+        addHeader("default");
+        payload.add("account " + accountToRemove + "@" + service + " removed successfully");
     }
 
     // generate random salt for password storing

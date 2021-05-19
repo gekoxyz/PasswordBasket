@@ -159,7 +159,14 @@ public class Client {
                         send(bytesToHex(loginPassword));
                         break;
                     case "service_password":
-                        password = new String(console.readPassword());
+                        System.out.println("do you want to use a randomly generated password? (y/n)");
+                        if (scan.nextLine().equals("y")) {
+                            password = PasswordGenerator.generateRandomPassword();
+                            System.out.println("generated the random password: " + password);
+                        } else {
+                            System.out.print("input your password: ");
+                            password = new String(console.readPassword());
+                        }
                         // setto il cipher in modalita` encrypt
                         cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
                         String encryptedCipher = bytesToHex(cipher.doFinal(password.getBytes()));

@@ -99,7 +99,6 @@ class ServerThread implements Runnable {
                     break;
             }
         }
-
     }
 
     // connessione al database

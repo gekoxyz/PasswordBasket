@@ -15,6 +15,11 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Clipboard;
+import java.awt.Toolkit;
+import java.util.Scanner;
+
 public class Client {
     private Socket socket;
 
@@ -66,6 +71,7 @@ public class Client {
         SecretKeySpec aesVaultKey = null;
         String preamble = "";
         String inputModifier = "";
+        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
         while (active) {
             getServerMessages();
             int headerLength = Integer.parseInt(messages.remove(0));
@@ -89,19 +95,38 @@ public class Client {
                         System.out.println("invalid decryption initialization");
                     }
                     int i = 0;
+                    int j = 0;
+                    List<String> decryptedPasswords = new ArrayList<String>();
                     try {
                         while (!messages.get(0).equals("end_decrypt")) {
                             if (i % 2 == 0) {
-                                System.out.print(messages.remove(0) + " -> ");
+                                j++;
+                                decryptedPasswords.add(messages.get(0));
+                                System.out.print(j + ". " + messages.remove(0) + " -> ");
                             } else {
+                                decryptedPasswords.add(new String(cipher.doFinal(hexToBytes(messages.get(0)))));
                                 System.out.println(new String(cipher.doFinal(hexToBytes(messages.remove(0)))));
                             }
                             i++;
                         }
-                        messages.remove(0);
                     } catch (IllegalBlockSizeException | BadPaddingException e) {
                         System.out.println("invalid decryption" + e);
                     }
+                    if (j == 1) {
+                        System.out.println("input 1 to copy the password to the clipboard (n to skip)");
+                    } else {
+                        System.out.println("input 1-" + j + " to copy a password to the clipboard. (n to skip)");
+                    }
+                    String passwordToCopy = scan.nextLine();
+                    if (!passwordToCopy.equals("n")) {
+                        StringSelection selection = new StringSelection(
+                                decryptedPasswords.get(Integer.parseInt(passwordToCopy)));
+                        clipboard.setContents(selection, null);
+                        System.out.println("password copied to the clipboard!");
+                    } else {
+                        System.out.println("password not copied to the clipboard!");
+                    }
+                    messages.remove(0);
                     break;
                 default:
                     break;

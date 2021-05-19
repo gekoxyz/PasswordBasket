@@ -344,6 +344,7 @@ class ServerThread implements Runnable {
         addHeader("default");
         payload.add("which service do you want to get the accounts of?");
         send();
+        // TODO: show the users all of his accounts
         String service = getUserInput();
         // select * from users_accounts where service = ? and user = ?
         try {

@@ -341,20 +341,32 @@ class ServerThread implements Runnable {
     }
 
     private void getServiceAccounts() {
+        PreparedStatement preparedStatement;
+        ResultSet rs = null;
         addHeader("default");
         payload.add("which service do you want to get the accounts of?");
+        try {
+            preparedStatement = dbConnection.prepareStatement("SELECT service FROM users_accounts WHERE user = ? GROUP BY service");
+            preparedStatement.setString(1, username);
+            rs = preparedStatement.executeQuery();
+            while(rs.next()){
+                String service = rs.getString("service");
+                payload.add(service);
+            }
+        } catch (SQLException e1) {
+            System.out.println("[ERROR] error while getting services for user " + e1);
+        }
         send();
-        // TODO: show the users all of his accounts
         String service = getUserInput();
         // select * from users_accounts where service = ? and user = ?
         try {
-            PreparedStatement preparedStatement = dbConnection
+            preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
             preparedStatement.setString(1, service);
             preparedStatement.setString(2, username);
             System.out.println(
                     "SELECT * FROM users_accounts WHERE service = '" + service + "' AND user = '" + username + "'");
-            ResultSet rs = preparedStatement.executeQuery();
+            rs = preparedStatement.executeQuery();
             System.out.println("[INFO] got results. printing to messages");
             addHeader("service_decrypt");
             while (rs.next()) {

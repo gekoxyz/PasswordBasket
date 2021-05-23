@@ -35,9 +35,11 @@ class ServerThread implements Runnable {
     private String username = "";
     private String password = "";
     private String salt = "";
+    private String mail = "";
     private String hashedPassword = "";
     private boolean invalidUsername;
     private String storedPassword = "";
+    private String valueToCheck = "";
 
     public ServerThread(Socket richiestaClient) {
         try {
@@ -107,7 +109,7 @@ class ServerThread implements Runnable {
         System.out.println("[INFO] Intializing database connection");
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/testmat", "root", "");
+            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/passwordbasket", "root", "");
         } catch (SQLException | ClassNotFoundException e) {
             System.out.println("[ERROR] errore nella connessione al database classnotfound/sql " + e);
         }
@@ -143,22 +145,40 @@ class ServerThread implements Runnable {
 
     private void register(Connection dbConnection) {
         String usernameToRegister = "";
+        String mailToRegister = "";
+        boolean invalidMail = true;
         System.out.println("[DEBUG] client selected register " + socket);
-        addHeader("username");
         payload.add("You selected register");
+        addHeader("mail");
+        while (invalidMail) {
+            payload.add("insert your email");
+            send();
+            boolean mailExists = checkFieldExistence(dbConnection, "mail");
+            if (mailExists) {
+                System.out.println("[DEBUG] mail exists, not available for the registration");
+                addHeader("mail");
+                payload.add("there is already an account associated with this email!");
+            } else {
+                System.out.println("[DEBUG] mail does not exists, available for the registration");
+                mailToRegister = valueToCheck;
+                addHeader("username");
+                payload.add("valid mail!");
+                invalidMail = false;
+            }
+        }
         invalidUsername = true;
         while (invalidUsername) {
             payload.add("input the username you want");
             send();
             // getting username
-            boolean usernameExists = checkUsernameExistence(dbConnection);
+            boolean usernameExists = checkFieldExistence(dbConnection, "username");
             if (usernameExists) {
                 System.out.println("[DEBUG] username exists, not available for the registration");
                 addHeader("username");
                 payload.add("sorry, username is taken :(");
             } else {
                 System.out.println("[DEBUG] username does not exists, available for the registration");
-                usernameToRegister = username;
+                usernameToRegister = valueToCheck;
                 addHeader("salt");
                 salt = bytesToHex(generateSalt());
                 addHeader(salt);
@@ -180,11 +200,13 @@ class ServerThread implements Runnable {
         hashedPassword = bytesToHex(messageDigest.digest());
         try {
             // preparing insert query and executing it
-            PreparedStatement preparedStatement = dbConnection
-                    .prepareStatement("INSERT INTO users_login (username, password, salt) VALUES (?, ?, ?)");
+            PreparedStatement preparedStatement = dbConnection.prepareStatement(
+                    "INSERT INTO user_login (username, password, salt, name, mail) VALUES (?, ?, ?, NULL, ?)");
             preparedStatement.setString(1, usernameToRegister);
             preparedStatement.setString(2, hashedPassword);
             preparedStatement.setString(3, salt);
+            // name
+            preparedStatement.setString(4, mailToRegister);
             // TODO: if rows affected = 0 throw login error
             int rowsAffected = preparedStatement.executeUpdate();
             System.out.println("[DEBUG] rows affected: " + rowsAffected);
@@ -205,7 +227,7 @@ class ServerThread implements Runnable {
             payload.add("input your username");
             send();
             // getting username
-            boolean usernameExists = checkUsernameExistence(dbConnection);
+            boolean usernameExists = checkFieldExistence(dbConnection, "username");
             if (!usernameExists) {
                 System.out.println("[DEBUG] username doesn't exist, invalid operation");
                 addHeader("username");
@@ -214,7 +236,10 @@ class ServerThread implements Runnable {
                 System.out.println("[DEBUG] username exists, valid operation");
                 addHeader("salt");
                 addHeader(salt);
+                addHeader("stored_mail");
+                addHeader(mail);
                 addHeader("password");
+                username = valueToCheck;
                 invalidUsername = false;
             }
         }
@@ -248,24 +273,25 @@ class ServerThread implements Runnable {
         loggedInOptions();
     }
 
-    // check if username exists in database
-    private boolean checkUsernameExistence(Connection dbConnection) {
+    private boolean checkFieldExistence(Connection dbConnection, String field) {
+        System.out.println("CHECKFIELDEXISTANCE STARTED");
         try {
-            username = getUserInput();
-            System.out.println("[DEBUG] got username to check if it exists in database");
+            valueToCheck = getUserInput();
+            System.out.println("[DEBUG] got field to check if it exists in database: " + valueToCheck);
             PreparedStatement preparedStatement = dbConnection
-                    .prepareStatement("SELECT * FROM users_login WHERE username = ?");
-            preparedStatement.setString(1, username);
+                    .prepareStatement("SELECT * FROM user_login WHERE " + field + " = ?");
+            preparedStatement.setString(1, valueToCheck);
             ResultSet rs = preparedStatement.executeQuery();
             if (!rs.next()) {
                 return false;
             } else {
                 storedPassword = rs.getString("password");
                 salt = rs.getString("salt");
+                mail = rs.getString("mail");
                 return true;
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("ERROR WHILE CHECKING FIELD EXISTANCE. FIELD: " + field + " " + e);
             return false;
         }
     }
@@ -325,7 +351,7 @@ class ServerThread implements Runnable {
         int rowsAffected = 0;
         try {
             PreparedStatement preparedStatement = dbConnection.prepareStatement(
-                    "INSERT INTO users_accounts (service, service_username, service_password, user) VALUES (?, ?, ?, ?)");
+                    "INSERT INTO user_accounts (service, service_username, service_password, username) VALUES (?, ?, ?, ?)");
             preparedStatement.setString(1, service);
             preparedStatement.setString(2, serviceUsername);
             preparedStatement.setString(3, servicePassword);
@@ -345,10 +371,11 @@ class ServerThread implements Runnable {
         addHeader("default");
         payload.add("which service do you want to get the accounts of?");
         try {
-            preparedStatement = dbConnection.prepareStatement("SELECT service FROM users_accounts WHERE user = ? GROUP BY service");
+            preparedStatement = dbConnection
+                    .prepareStatement("SELECT service FROM user_accounts WHERE username = ? GROUP BY service");
             preparedStatement.setString(1, username);
             rs = preparedStatement.executeQuery();
-            while(rs.next()){
+            while (rs.next()) {
                 String service = rs.getString("service");
                 payload.add(service);
             }
@@ -360,11 +387,11 @@ class ServerThread implements Runnable {
         // select * from users_accounts where service = ? and user = ?
         try {
             preparedStatement = dbConnection
-                    .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
+                    .prepareStatement("SELECT * FROM user_accounts WHERE service = ? AND username = ?");
             preparedStatement.setString(1, service);
             preparedStatement.setString(2, username);
             System.out.println(
-                    "SELECT * FROM users_accounts WHERE service = '" + service + "' AND user = '" + username + "'");
+                    "SELECT * FROM user_accounts WHERE service = '" + service + "' AND username = '" + username + "'");
             rs = preparedStatement.executeQuery();
             System.out.println("[INFO] got results. printing to messages");
             addHeader("service_decrypt");
@@ -393,7 +420,7 @@ class ServerThread implements Runnable {
         PreparedStatement preparedStatement;
         try {
             preparedStatement = dbConnection
-                    .prepareStatement("SELECT * FROM users_accounts WHERE service = ? AND user = ?");
+                    .prepareStatement("SELECT * FROM user_accounts WHERE service = ? AND username = ?");
             preparedStatement.setString(1, service);
             preparedStatement.setString(2, username);
             ResultSet rs = preparedStatement.executeQuery();
@@ -414,7 +441,7 @@ class ServerThread implements Runnable {
         System.out.println("[INFO] user wants to remove " + accountToRemove);
         try {
             preparedStatement = dbConnection.prepareStatement(
-                    "DELETE FROM users_accounts WHERE service = ? AND service_username = ? AND user = ?");
+                    "DELETE FROM user_accounts WHERE service = ? AND service_username = ? AND username = ?");
             preparedStatement.setString(1, service);
             preparedStatement.setString(2, accountToRemove);
             preparedStatement.setString(3, username);
@@ -438,17 +465,17 @@ class ServerThread implements Runnable {
         return bytes;
     }
 
-    private static final Set<String> PREAMBLES = Set.of("salt", "service_decrypt");
+    private static final Set<String> PREAMBLES = Set.of("salt", "service_decrypt", "stored_mail");
     // private static final Set<String> INPUT_MODIFIERS = Set.of("default",
     // "username", "password", "service_password");
 
     private void addHeader(String option) {
         headerLength++;
-        if (PREAMBLES.contains(option)) {
-            header.add(0, option);
-        } else {
+        // if (PREAMBLES.contains(option)) {
+        //     header.add(0, option);
+        // } else {
             header.add(option);
-        }
+        // }
     }
 
     private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);

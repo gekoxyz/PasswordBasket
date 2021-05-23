@@ -71,65 +71,78 @@ public class Client {
         SecretKeySpec aesVaultKey = null;
         String preamble = "";
         String inputModifier = "";
+        String mail = "";
         Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
         while (active) {
             getServerMessages();
+            System.out.println(messages);
             int headerLength = Integer.parseInt(messages.remove(0));
+            System.out.println("header length: " + headerLength);
             headerLength--;
             inputModifier = messages.remove(headerLength);
-            headerLength--;
-            if (headerLength >= 0) {
+            System.out.println("input modifier: " + inputModifier);
+            while (headerLength > 0) {
                 preamble = messages.remove(0);
-            }
-            switch (preamble) {
-                case "salt":
-                    salt = messages.remove(0);
-                    System.out.println("GOT THE SALT " + salt);
-                    break;
-                case "service_decrypt":
-                    // decrypt
-                    // setto il cipher in modalita` decrypt
-                    try {
-                        cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
-                    } catch (InvalidKeyException e1) {
-                        System.out.println("invalid decryption initialization");
-                    }
-                    int i = 0;
-                    int j = 0;
-                    List<String> decryptedPasswords = new ArrayList<String>();
-                    try {
-                        while (!messages.get(0).equals("end_decrypt")) {
-                            if (i % 2 == 0) {
-                                j++;
-                                decryptedPasswords.add(messages.get(0));
-                                System.out.print(j + ". " + messages.remove(0) + " -> ");
-                            } else {
-                                decryptedPasswords.add(new String(cipher.doFinal(hexToBytes(messages.get(0)))));
-                                System.out.println(new String(cipher.doFinal(hexToBytes(messages.remove(0)))));
-                            }
-                            i++;
+                headerLength--;
+                System.out.println("preamble: " + preamble);
+                switch (preamble) {
+                    case "salt":
+                        salt = messages.remove(0);
+                        System.out.println("GOT THE SALT " + salt);
+                        headerLength--;
+                        break;
+                    case "stored_mail":
+                        mail = messages.remove(0);
+                        System.out.println("GOT THE MAIL ASSOCIATED TO THIS ACCOUNT " + mail);
+                        headerLength--;
+                        break;
+                    case "service_decrypt":
+                        // decrypt
+                        // setto il cipher in modalita` decrypt
+                        try {
+                            cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
+                        } catch (InvalidKeyException e1) {
+                            System.out.println("invalid decryption initialization");
                         }
-                    } catch (IllegalBlockSizeException | BadPaddingException e) {
-                        System.out.println("invalid decryption" + e);
-                    }
-                    if (j == 1) {
-                        System.out.println("input 1 to copy the password to the clipboard (n to skip)");
-                    } else {
-                        System.out.println("input 1-" + j + " to copy a password to the clipboard. (n to skip)");
-                    }
-                    String passwordToCopy = scan.nextLine();
-                    if (!passwordToCopy.equals("n")) {
-                        StringSelection selection = new StringSelection(
-                                decryptedPasswords.get(Integer.parseInt(passwordToCopy)));
-                        clipboard.setContents(selection, null);
-                        System.out.println("password copied to the clipboard!");
-                    } else {
-                        System.out.println("password not copied to the clipboard!");
-                    }
-                    messages.remove(0);
-                    break;
-                default:
-                    break;
+                        int i = 0;
+                        int j = 0;
+                        List<String> decryptedPasswords = new ArrayList<String>();
+                        try {
+                            while (!messages.get(0).equals("end_decrypt")) {
+                                if (i % 2 == 0) {
+                                    j++;
+                                    System.out.print(j + ". " + messages.remove(0) + " -> ");
+                                } else {
+                                    decryptedPasswords.add(new String(cipher.doFinal(hexToBytes(messages.get(0)))));
+                                    System.out.println(new String(cipher.doFinal(hexToBytes(messages.remove(0)))));
+                                }
+                                i++;
+                                headerLength--;
+                            }
+                            System.out.print("DECRYPTED PASSWORDS: ");
+                            System.out.println(decryptedPasswords);
+                        } catch (IllegalBlockSizeException | BadPaddingException e) {
+                            System.out.println("invalid decryption" + e);
+                        }
+                        if (j == 1) {
+                            System.out.println("input 1 to copy the password to the clipboard (n to skip)");
+                        } else {
+                            System.out.println("input 1-" + j + " to copy a password to the clipboard. (n to skip)");
+                        }
+                        String passwordToCopy = scan.nextLine();
+                        if (!passwordToCopy.equals("n")) {
+                            StringSelection selection = new StringSelection(
+                                    decryptedPasswords.get(Integer.parseInt(passwordToCopy) - 1));
+                            clipboard.setContents(selection, null);
+                            System.out.println("password copied to the clipboard!");
+                        } else {
+                            System.out.println("password not copied to the clipboard!");
+                        }
+                        messages.remove(0);
+                        break;
+                    default:
+                        break;
+                }
             }
             for (String msg : messages) {
                 System.out.println(msg);
@@ -145,12 +158,16 @@ public class Client {
                         username = scan.nextLine();
                         send(username);
                         break;
+                    case "mail":
+                        mail = scan.nextLine();
+                        send(mail);
+                        break;
                     case "password":
                         password = new String(console.readPassword());
                         // hashing vault key + pass to get the login password
                         // hash(vaultKey+pass)
                         // hash(hash(user+pass)+pass)
-                        vaultKey = pbkdf2(password + username, salt);
+                        vaultKey = pbkdf2(password + mail, salt);
                         System.out.println("[DEBUG] vault key: " + bytesToHex(vaultKey));
                         loginPassword = pbkdf2(bytesToHex(vaultKey) + password, salt);
                         System.out.println("[DEBUG] auth key: " + bytesToHex(loginPassword));

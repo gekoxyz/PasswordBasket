@@ -10,7 +10,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -274,12 +273,11 @@ class ServerThread implements Runnable {
     }
 
     private boolean checkFieldExistence(Connection dbConnection, String field) {
-        System.out.println("CHECKFIELDEXISTANCE STARTED");
+        PreparedStatement preparedStatement;
         try {
             valueToCheck = getUserInput();
             System.out.println("[DEBUG] got field to check if it exists in database: " + valueToCheck);
-            PreparedStatement preparedStatement = dbConnection
-                    .prepareStatement("SELECT * FROM user_login WHERE " + field + " = ?");
+            preparedStatement = dbConnection.prepareStatement("SELECT * FROM user_login WHERE " + field + " = ?");
             preparedStatement.setString(1, valueToCheck);
             ResultSet rs = preparedStatement.executeQuery();
             if (!rs.next()) {
@@ -314,7 +312,7 @@ class ServerThread implements Runnable {
                     break;
                 case "2":
                     // user wants to retreive a service's accounts
-                    getServiceAccounts();
+                    getServiceAccount();
                     break;
                 case "3":
                     // user wants to remove a service
@@ -365,11 +363,9 @@ class ServerThread implements Runnable {
         System.out.println("[DEBUG] add service query successful. rows affected:" + rowsAffected);
     }
 
-    private void getServiceAccounts() {
+    private String getServiceToManipulate() {
         PreparedStatement preparedStatement;
-        ResultSet rs = null;
-        addHeader("default");
-        payload.add("which service do you want to get the accounts of?");
+        ResultSet rs;
         try {
             preparedStatement = dbConnection
                     .prepareStatement("SELECT service FROM user_accounts WHERE username = ? GROUP BY service");
@@ -383,15 +379,23 @@ class ServerThread implements Runnable {
             System.out.println("[ERROR] error while getting services for user " + e1);
         }
         send();
-        String service = getUserInput();
+        return getUserInput();
+    }
+
+    private void getServiceAccount() {
+        PreparedStatement preparedStatement;
+        ResultSet rs;
+        addHeader("default");
+        payload.add("which service do you want to get the accounts of?");
+        String serviceToGet = getServiceToManipulate();
         // select * from users_accounts where service = ? and user = ?
         try {
             preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM user_accounts WHERE service = ? AND username = ?");
-            preparedStatement.setString(1, service);
+            preparedStatement.setString(1, serviceToGet);
             preparedStatement.setString(2, username);
-            System.out.println(
-                    "SELECT * FROM user_accounts WHERE service = '" + service + "' AND username = '" + username + "'");
+            System.out.println("SELECT * FROM user_accounts WHERE service = '" + serviceToGet + "' AND username = '"
+                    + username + "'");
             rs = preparedStatement.executeQuery();
             System.out.println("[INFO] got results. printing to messages");
             addHeader("service_decrypt");
@@ -412,38 +416,37 @@ class ServerThread implements Runnable {
     }
 
     private void deleteServiceAccount() {
-        int rowsAffected = 0;
+        PreparedStatement preparedStatement;
         addHeader("default");
         payload.add("what service do you want to delete the account of?");
-        send();
-        String service = getUserInput();
-        PreparedStatement preparedStatement;
+        String serviceToDelete = getServiceToManipulate();
         try {
             preparedStatement = dbConnection
                     .prepareStatement("SELECT * FROM user_accounts WHERE service = ? AND username = ?");
-            preparedStatement.setString(1, service);
+            preparedStatement.setString(1, serviceToDelete);
             preparedStatement.setString(2, username);
             ResultSet rs = preparedStatement.executeQuery();
             System.out.println("[INFO] got results. printing to messages");
             addHeader("default");
-            payload.add("what " + service + " account do you want to remove? (input account username)");
+            payload.add("what " + serviceToDelete + " account do you want to remove? (input account username)");
             while (rs.next()) {
                 String serviceUsername = rs.getString("service_username");
                 payload.add(serviceUsername);
                 System.out.println("[INFO] sending to user ");
-                System.out.println("username:" + serviceUsername + "@" + service);
+                System.out.println("username:" + serviceUsername + "@" + serviceToDelete);
             }
         } catch (SQLException e) {
             System.out.println("[ERROR] error while fetching accounts for service for user " + e);
         }
         send();
-        String accountToRemove = getUserInput();
-        System.out.println("[INFO] user wants to remove " + accountToRemove);
+        String accountToDelete = getUserInput();
+        System.out.println("[INFO] user wants to remove " + accountToDelete);
+        int rowsAffected = 0;
         try {
             preparedStatement = dbConnection.prepareStatement(
                     "DELETE FROM user_accounts WHERE service = ? AND service_username = ? AND username = ?");
-            preparedStatement.setString(1, service);
-            preparedStatement.setString(2, accountToRemove);
+            preparedStatement.setString(1, serviceToDelete);
+            preparedStatement.setString(2, accountToDelete);
             preparedStatement.setString(3, username);
             rowsAffected = preparedStatement.executeUpdate();
         } catch (SQLException e) {
@@ -454,7 +457,7 @@ class ServerThread implements Runnable {
          */
         System.out.println("[INFO] rows affected: " + rowsAffected);
         addHeader("default");
-        payload.add("account " + accountToRemove + "@" + service + " removed successfully");
+        payload.add("account " + accountToDelete + "@" + serviceToDelete + " removed successfully");
     }
 
     // generate random salt for password storing
@@ -465,17 +468,9 @@ class ServerThread implements Runnable {
         return bytes;
     }
 
-    private static final Set<String> PREAMBLES = Set.of("salt", "service_decrypt", "stored_mail");
-    // private static final Set<String> INPUT_MODIFIERS = Set.of("default",
-    // "username", "password", "service_password");
-
     private void addHeader(String option) {
         headerLength++;
-        // if (PREAMBLES.contains(option)) {
-        //     header.add(0, option);
-        // } else {
-            header.add(option);
-        // }
+        header.add(option);
     }
 
     private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);

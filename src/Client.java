@@ -13,7 +13,6 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-
 import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Clipboard;
 import java.awt.Toolkit;
@@ -85,17 +84,17 @@ public class Client {
                 headerLength--;
                 System.out.println("preamble: " + preamble);
                 switch (preamble) {
-                    case "salt":
+                    case Headers.SALT:
                         salt = messages.remove(0);
-                        System.out.println("GOT THE SALT " + salt);
+                        System.out.println("[INFO] GOT THE SALT " + salt);
                         headerLength--;
                         break;
-                    case "stored_mail":
+                    case Headers.STORED_MAIL:
                         mail = messages.remove(0);
-                        System.out.println("GOT THE MAIL ASSOCIATED TO THIS ACCOUNT " + mail);
+                        System.out.println("[INFO] GOT THE MAIL ASSOCIATED TO THIS ACCOUNT " + mail);
                         headerLength--;
                         break;
-                    case "service_decrypt":
+                    case Headers.SERVICE_DECRYPT:
                         // decrypt
                         // setto il cipher in modalita` decrypt
                         try {
@@ -103,19 +102,19 @@ public class Client {
                         } catch (InvalidKeyException e1) {
                             System.out.println("invalid decryption initialization");
                         }
-                        int i = 0;
-                        int j = 0;
+                        int toDecrypt = 0;
+                        int decryptedPasswordsNumber = 0;
                         List<String> decryptedPasswords = new ArrayList<String>();
                         try {
-                            while (!messages.get(0).equals("end_decrypt")) {
-                                if (i % 2 == 0) {
-                                    j++;
-                                    System.out.print(j + ". " + messages.remove(0) + " -> ");
+                            while (!messages.get(0).equals(Headers.END_DECRYPT)) {
+                                if (toDecrypt % 2 == 0) {
+                                    decryptedPasswordsNumber++;
+                                    System.out.print(decryptedPasswordsNumber + ". " + messages.remove(0) + " -> ");
                                 } else {
                                     decryptedPasswords.add(new String(cipher.doFinal(Converter.hexToBytes(messages.get(0)))));
                                     System.out.println(new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
                                 }
-                                i++;
+                                toDecrypt++;
                                 headerLength--;
                             }
                             System.out.print("DECRYPTED PASSWORDS: ");
@@ -123,10 +122,10 @@ public class Client {
                         } catch (IllegalBlockSizeException | BadPaddingException e) {
                             System.out.println("invalid decryption" + e);
                         }
-                        if (j == 1) {
+                        if (decryptedPasswordsNumber == 1) {
                             System.out.println("input 1 to copy the password to the clipboard (n to skip)");
                         } else {
-                            System.out.println("input 1-" + j + " to copy a password to the clipboard. (n to skip)");
+                            System.out.println("input 1-" + decryptedPasswordsNumber + " to copy a password to the clipboard. (n to skip)");
                         }
                         String passwordToCopy = scan.nextLine();
                         if (!passwordToCopy.equals("n")) {
@@ -149,19 +148,19 @@ public class Client {
             messages.clear();
             try {
                 switch (inputModifier) {
-                    case "default":
+                    case Headers.DEFAULT:
                         message = scan.nextLine();
                         send(message);
                         break;
-                    case "username":
+                    case Headers.USERNAME:
                         username = scan.nextLine();
                         send(username);
                         break;
-                    case "mail":
+                    case Headers.MAIL:
                         mail = scan.nextLine();
                         send(mail);
                         break;
-                    case "password":
+                    case Headers.PASSWORD:
                         password = new String(console.readPassword());
                         // hashing vault key + pass to get the login password
                         // hash(vaultKey+pass)
@@ -174,7 +173,7 @@ public class Client {
                         System.out.println("[SECRETKEY] " + aesVaultKey);
                         send(Converter.bytesToHex(loginPassword));
                         break;
-                    case "service_password":
+                    case Headers.SERVICE_PASSWORD:
                         System.out.println("do you want to use a randomly generated password? (y/n)");
                         if (scan.nextLine().equals("y")) {
                             password = PasswordGenerator.generateRandomPassword();
@@ -190,7 +189,7 @@ public class Client {
                         System.out.println(encryptedCipher);
                         send(encryptedCipher);
                         break;
-                    case "no_operation":
+                    case Headers.NO_OPERATIONS:
                         System.out.println("goodbye!");
                         break;
                     default:

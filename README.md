@@ -1,8 +1,10 @@
 # PasswordBasket
-Elaborato maturità 2021, Galiazzo Matteo
-password manager in java che custodisce le password di un utente e fa da password generator
+
+Elaborato maturità 2021, Galiazzo Matteo.
+password manager in java that keeps an user's passwords and serves as password generator
 
 Database structure:
+
 ```
 CREATE TABLE user_login (
   username varchar(25) PRIMARY KEY,

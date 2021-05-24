@@ -1,5 +1,4 @@
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -8,6 +7,10 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.IOException;
@@ -45,7 +48,8 @@ class ServerThread implements Runnable {
             // aggiungere messaggi cosi` formattati: 2015-11-10 15:26:57 4348 [Note] Server
             // socket created on IP: '::'.
             socket = richiestaClient;
-            System.out.println("[INFO] " + socket + " connected ");
+            System.out.println(
+                    printHour() + " [INFO] " + socket.getLocalAddress() + ":" + socket.getLocalPort() + " connected ");
             dbConnection = connectToDatabase();
             System.out.println("[INFO] Database connected");
             // -- SEND --
@@ -179,7 +183,7 @@ class ServerThread implements Runnable {
                 System.out.println("[DEBUG] username does not exists, available for the registration");
                 usernameToRegister = valueToCheck;
                 addHeader("salt");
-                salt = bytesToHex(generateSalt());
+                salt = Converter.bytesToHex(generateSalt());
                 addHeader(salt);
                 addHeader("password");
                 payload.add("username is not taken yet :)");
@@ -189,14 +193,8 @@ class ServerThread implements Runnable {
         System.out.println("[DEBUG] username not taken, sending result to " + socket);
         payload.add("Input the password");
         send();
-        // get password
-        // TODO: PUT PASSWORD REQUEST PART IN SEPARATE METHOD
-        password = getUserInput();
-        System.out.println("[DEBUG] got password request");
-        // hashing the password, generating a random salt and saving it to the database
-        // to finally secure login credentials
-        messageDigest.update((password + salt).getBytes());
-        hashedPassword = bytesToHex(messageDigest.digest());
+        // get password and hash it
+        hashedPassword = getHashedPassword();
         try {
             // preparing insert query and executing it
             PreparedStatement preparedStatement = dbConnection.prepareStatement(
@@ -248,10 +246,7 @@ class ServerThread implements Runnable {
             System.out.println("[DEBUG] asking for the password");
             payload.add("input your password");
             send();
-            password = getUserInput();
-            System.out.println("[DEBUG] password received");
-            messageDigest.update((password + salt).getBytes());
-            hashedPassword = bytesToHex(messageDigest.digest());
+            hashedPassword = getHashedPassword();
             System.out.println("[DEBUG] password validation");
             System.out.println("stored password: " + storedPassword);
             System.out.println("hashed password: " + hashedPassword);
@@ -270,6 +265,13 @@ class ServerThread implements Runnable {
         }
         payload.add("successfully logged in!");
         loggedInOptions();
+    }
+
+    private String getHashedPassword() {
+        password = getUserInput();
+        System.out.println("[DEBUG] password received");
+        messageDigest.update((password + salt).getBytes());
+        return Converter.bytesToHex(messageDigest.digest());
     }
 
     private boolean checkFieldExistence(Connection dbConnection, String field) {
@@ -473,25 +475,8 @@ class ServerThread implements Runnable {
         header.add(option);
     }
 
-    private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
-
-    public static String bytesToHex(byte[] bytes) {
-        byte[] hexChars = new byte[bytes.length * 2];
-        for (int j = 0; j < bytes.length; j++) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
-            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
-        }
-        return new String(hexChars, StandardCharsets.UTF_8);
-    }
-
-    public static byte[] hexToBytes(String str) {
-        byte[] val = new byte[str.length() / 2];
-        for (int i = 0; i < val.length; i++) {
-            int index = i * 2;
-            int j = Integer.parseInt(str.substring(index, index + 2), 16);
-            val[i] = (byte) j;
-        }
-        return val;
+    private static String printHour() {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
+        return new String(LocalTime.now().format(dtf));
     }
 }

@@ -1,5 +1,4 @@
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
@@ -32,6 +31,18 @@ public class Client {
     private List<String> messages = new ArrayList<String>();
     private Cipher cipher;
     private String salt = "";
+    private Scanner scan = new Scanner(System.in);
+    private String message = "";
+    private String username = "";
+    private String password = "";
+    private Console console = System.console();
+    private byte[] vaultKey = null;
+    private byte[] loginPassword = null;
+    private SecretKeySpec aesVaultKey = null;
+    private String preamble = "";
+    private String inputModifier = "";
+    private String mail = "";
+    private Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
 
     public Client() {
         try {
@@ -61,18 +72,6 @@ public class Client {
 
     private void run() {
         // conversazione lato client
-        Scanner scan = new Scanner(System.in);
-        String message = "";
-        String username = "";
-        String password = "";
-        Console console = System.console();
-        byte[] vaultKey = null;
-        byte[] loginPassword = null;
-        SecretKeySpec aesVaultKey = null;
-        String preamble = "";
-        String inputModifier = "";
-        String mail = "";
-        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
         while (active) {
             getServerMessages();
             System.out.println(messages);
@@ -113,8 +112,8 @@ public class Client {
                                     j++;
                                     System.out.print(j + ". " + messages.remove(0) + " -> ");
                                 } else {
-                                    decryptedPasswords.add(new String(cipher.doFinal(hexToBytes(messages.get(0)))));
-                                    System.out.println(new String(cipher.doFinal(hexToBytes(messages.remove(0)))));
+                                    decryptedPasswords.add(new String(cipher.doFinal(Converter.hexToBytes(messages.get(0)))));
+                                    System.out.println(new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
                                 }
                                 i++;
                                 headerLength--;
@@ -168,12 +167,12 @@ public class Client {
                         // hash(vaultKey+pass)
                         // hash(hash(user+pass)+pass)
                         vaultKey = pbkdf2(password + mail, salt);
-                        System.out.println("[DEBUG] vault key: " + bytesToHex(vaultKey));
-                        loginPassword = pbkdf2(bytesToHex(vaultKey) + password, salt);
-                        System.out.println("[DEBUG] auth key: " + bytesToHex(loginPassword));
+                        System.out.println("[DEBUG] vault key: " + Converter.bytesToHex(vaultKey));
+                        loginPassword = pbkdf2(Converter.bytesToHex(vaultKey) + password, salt);
+                        System.out.println("[DEBUG] auth key: " + Converter.bytesToHex(loginPassword));
                         aesVaultKey = new SecretKeySpec(vaultKey, "AES");
                         System.out.println("[SECRETKEY] " + aesVaultKey);
-                        send(bytesToHex(loginPassword));
+                        send(Converter.bytesToHex(loginPassword));
                         break;
                     case "service_password":
                         System.out.println("do you want to use a randomly generated password? (y/n)");
@@ -186,7 +185,7 @@ public class Client {
                         }
                         // setto il cipher in modalita` encrypt
                         cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
-                        String encryptedCipher = bytesToHex(cipher.doFinal(password.getBytes()));
+                        String encryptedCipher = Converter.bytesToHex(cipher.doFinal(password.getBytes()));
                         // ENCRYPTED CIPHER
                         System.out.println(encryptedCipher);
                         send(encryptedCipher);
@@ -231,27 +230,5 @@ public class Client {
             System.out.println("[ERROR] error while receiving messages from the server " + e);
         }
         return messages;
-    }
-
-    private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
-
-    public static String bytesToHex(byte[] bytes) {
-        byte[] hexChars = new byte[bytes.length * 2];
-        for (int j = 0; j < bytes.length; j++) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
-            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
-        }
-        return new String(hexChars, StandardCharsets.UTF_8);
-    }
-
-    public static byte[] hexToBytes(String str) {
-        byte[] val = new byte[str.length() / 2];
-        for (int i = 0; i < val.length; i++) {
-            int index = i * 2;
-            int j = Integer.parseInt(str.substring(index, index + 2), 16);
-            val[i] = (byte) j;
-        }
-        return val;
     }
 }

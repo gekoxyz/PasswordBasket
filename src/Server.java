@@ -1,4 +1,6 @@
 import java.net.*;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.io.*;
 
 public class Server {
@@ -7,7 +9,7 @@ public class Server {
     public Server() {
         try {
             server = new ServerSocket(10000);
-            System.out.println("[INFO] server attivo");
+            System.out.println(getHour() + " [INFO] server attivo");
         } catch (IOException e) {
             System.out.println(e);
         }
@@ -27,5 +29,10 @@ public class Server {
         } catch (IOException e) {
             System.out.println(e);
         }
+    }
+
+    private String getHour() {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
+        return new String(LocalTime.now().format(dtf));
     }
 }

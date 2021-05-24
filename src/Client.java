@@ -3,6 +3,8 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.io.*;
 import java.util.*;
 
@@ -65,6 +67,11 @@ public class Client {
     }
 
     public static void main(String[] args) {
+        System.out.println("  ____                                     _ ____            _        _   ");
+        System.out.println(" |  _ \\ __ _ ___ _____      _____  _ __ __| | __ )  __ _ ___| | _____| |_ ");
+        System.out.println(" | |_) / _` / __/ __\\ \\ /\\ / / _ \\| '__/ _` |  _ \\ / _` / __| |/ / _ \\ __|");
+        System.out.println(" |  __/ (_| \\__ \\__ \\\\ V  V / (_) | | | (_| | |_) | (_| \\__ \\   <  __/ |_ ");
+        System.out.println(" |_|   \\__,_|___/___/ \\_/\\_/ \\___/|_|  \\__,_|____/ \\__,_|___/_|\\_\\___|\\__|");
         Client client = new Client();
         client.run();
     }
@@ -73,25 +80,22 @@ public class Client {
         // conversazione lato client
         while (active) {
             getServerMessages();
-            System.out.println(messages);
             int headerLength = Integer.parseInt(messages.remove(0));
-            System.out.println("header length: " + headerLength);
             headerLength--;
             inputModifier = messages.remove(headerLength);
-            System.out.println("input modifier: " + inputModifier);
             while (headerLength > 0) {
                 preamble = messages.remove(0);
                 headerLength--;
-                System.out.println("preamble: " + preamble);
                 switch (preamble) {
                     case Headers.SALT:
                         salt = messages.remove(0);
-                        System.out.println("[INFO] GOT THE SALT " + salt);
+                        System.out.println(getHour() + " [INFO] " + getSocketAddress() + " got the salt " + salt);
                         headerLength--;
                         break;
                     case Headers.STORED_MAIL:
                         mail = messages.remove(0);
-                        System.out.println("[INFO] GOT THE MAIL ASSOCIATED TO THIS ACCOUNT " + mail);
+                        System.out.println(getHour() + " [INFO] " + getSocketAddress()
+                                + " got the mail associated to this account " + mail);
                         headerLength--;
                         break;
                     case Headers.SERVICE_DECRYPT:
@@ -111,21 +115,22 @@ public class Client {
                                     decryptedPasswordsNumber++;
                                     System.out.print(decryptedPasswordsNumber + ". " + messages.remove(0) + " -> ");
                                 } else {
-                                    decryptedPasswords.add(new String(cipher.doFinal(Converter.hexToBytes(messages.get(0)))));
-                                    System.out.println(new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
+                                    decryptedPasswords
+                                            .add(new String(cipher.doFinal(Converter.hexToBytes(messages.get(0)))));
+                                    System.out.println(
+                                            new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
                                 }
                                 toDecrypt++;
                                 headerLength--;
                             }
-                            System.out.print("DECRYPTED PASSWORDS: ");
-                            System.out.println(decryptedPasswords);
                         } catch (IllegalBlockSizeException | BadPaddingException e) {
                             System.out.println("invalid decryption" + e);
                         }
                         if (decryptedPasswordsNumber == 1) {
                             System.out.println("input 1 to copy the password to the clipboard (n to skip)");
                         } else {
-                            System.out.println("input 1-" + decryptedPasswordsNumber + " to copy a password to the clipboard. (n to skip)");
+                            System.out.println("input 1-" + decryptedPasswordsNumber
+                                    + " to copy a password to the clipboard. (n to skip)");
                         }
                         String passwordToCopy = scan.nextLine();
                         if (!passwordToCopy.equals("n")) {
@@ -166,11 +171,13 @@ public class Client {
                         // hash(vaultKey+pass)
                         // hash(hash(user+pass)+pass)
                         vaultKey = pbkdf2(password + mail, salt);
-                        System.out.println("[DEBUG] vault key: " + Converter.bytesToHex(vaultKey));
+                        System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " vault key: "
+                                + Converter.bytesToHex(vaultKey));
                         loginPassword = pbkdf2(Converter.bytesToHex(vaultKey) + password, salt);
-                        System.out.println("[DEBUG] auth key: " + Converter.bytesToHex(loginPassword));
+                        System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " auth key: "
+                                + Converter.bytesToHex(loginPassword));
                         aesVaultKey = new SecretKeySpec(vaultKey, "AES");
-                        System.out.println("[SECRETKEY] " + aesVaultKey);
+                        System.out.println(getHour() + " [SECRETKEY] " + getSocketAddress() + " " + aesVaultKey);
                         send(Converter.bytesToHex(loginPassword));
                         break;
                     case Headers.SERVICE_PASSWORD:
@@ -222,12 +229,23 @@ public class Client {
 
     private List<String> getServerMessages() {
         try {
-            System.out.println("[DEBUG] waiting for message " + socket);
+            System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " waiting for server message");
             messages = (List<String>) objectInputStream.readObject();
-            System.out.println("Received [" + (messages.size()) + "] messages from: " + socket);
+            // System.out.println("Received [" + (messages.size()) + "] messages from: " +
+            // socket);
         } catch (ClassNotFoundException | IOException e) {
-            System.out.println("[ERROR] error while receiving messages from the server " + e);
+            System.out.println(getHour() + " [ERROR] " + getSocketAddress()
+                    + " error while receiving messages from the server " + e);
         }
         return messages;
+    }
+
+    private String getHour() {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
+        return new String(LocalTime.now().format(dtf));
+    }
+
+    private String getSocketAddress() {
+        return socket.getLocalAddress() + ":" + socket.getLocalPort();
     }
 }

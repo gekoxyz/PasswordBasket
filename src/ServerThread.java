@@ -329,7 +329,7 @@ class ServerThread implements Runnable {
     }
 
     private void addServiceAccount() {
-        addHeader(Headers.DEFAULT);
+        addHeader(Headers.ENCRYPTED_DATA);
         payload.add("what service do you want to add?");
         send();
         String service = getUserInput();
@@ -372,10 +372,13 @@ class ServerThread implements Runnable {
                     .prepareStatement("SELECT service FROM user_accounts WHERE username = ? GROUP BY service");
             preparedStatement.setString(1, username);
             rs = preparedStatement.executeQuery();
+            addHeader(Headers.START_DECRYPT);
             while (rs.next()) {
                 String service = rs.getString("service");
-                payload.add(service);
+                addHeader(service);
             }
+            addHeader(Headers.END_DECRYPT);
+            addHeader(Headers.ENCRYPTED_DATA);
         } catch (SQLException e1) {
             printErrorMessage("error while getting services for user", e1);
         }
@@ -386,8 +389,8 @@ class ServerThread implements Runnable {
     private void getServiceAccount() {
         PreparedStatement preparedStatement;
         ResultSet rs;
-        addHeader(Headers.DEFAULT);
-        payload.add("which service do you want to get the accounts of?");
+        addHeader(Headers.SERVICE_DECRYPT);
+        addHeader("which service do you want to get the accounts of?");
         String serviceToGet = getServiceToManipulate();
         // select * from users_accounts where service = ? and user = ?
         try {
@@ -400,7 +403,7 @@ class ServerThread implements Runnable {
                             + serviceToGet + "' AND username = '" + username + "'");
             rs = preparedStatement.executeQuery();
             System.out.println(getHour() + " [INFO] " + getSocketAddress() + " got results. printing to messages");
-            addHeader(Headers.SERVICE_DECRYPT);
+            addHeader(Headers.CREDENTIALS_DECRYPT);
             while (rs.next()) {
                 String serviceUsername = rs.getString("service_username");
                 String servicePassword = rs.getString("service_password");
@@ -419,8 +422,8 @@ class ServerThread implements Runnable {
 
     private void deleteServiceAccount() {
         PreparedStatement preparedStatement;
-        addHeader(Headers.DEFAULT);
-        payload.add("what service do you want to delete the account of?");
+        addHeader(Headers.SERVICE_DECRYPT);
+        addHeader("what service do you want to delete the account of?");
         String serviceToDelete = getServiceToManipulate();
         try {
             preparedStatement = dbConnection
@@ -429,8 +432,9 @@ class ServerThread implements Runnable {
             preparedStatement.setString(2, username);
             ResultSet rs = preparedStatement.executeQuery();
             System.out.println(getHour() + " [INFO] " + getSocketAddress() + " got results. printing to messages");
-            addHeader(Headers.USERNAME_DECRYPT);
-            addHeader("what " + serviceToDelete + " account do you want to remove? (input account username)");
+            addHeader(Headers.SERVICE_DECRYPT);
+            addHeader("what account do you want to remove? (input account username)");
+            addHeader(Headers.START_DECRYPT);
             while (rs.next()) {
                 String serviceUsername = rs.getString("service_username");
                 addHeader(serviceUsername);

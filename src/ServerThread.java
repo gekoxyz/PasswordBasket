@@ -333,7 +333,7 @@ class ServerThread implements Runnable {
         payload.add("what service do you want to add?");
         send();
         String service = getUserInput();
-        addHeader(Headers.DEFAULT);
+        addHeader(Headers.SERVICE_USERNAME);
         payload.add("what's the username for " + service + "?");
         send();
         String serviceUsername = getUserInput();
@@ -429,15 +429,17 @@ class ServerThread implements Runnable {
             preparedStatement.setString(2, username);
             ResultSet rs = preparedStatement.executeQuery();
             System.out.println(getHour() + " [INFO] " + getSocketAddress() + " got results. printing to messages");
-            addHeader(Headers.DEFAULT);
-            payload.add("what " + serviceToDelete + " account do you want to remove? (input account username)");
+            addHeader(Headers.USERNAME_DECRYPT);
+            addHeader("what " + serviceToDelete + " account do you want to remove? (input account username)");
             while (rs.next()) {
                 String serviceUsername = rs.getString("service_username");
-                payload.add(serviceUsername);
+                addHeader(serviceUsername);
                 System.out.println(getHour() + " [INFO] " + getSocketAddress() + " sending to user ");
                 System.out.println(getHour() + " [INFO] " + getSocketAddress() + " username:" + serviceUsername + "@"
                         + serviceToDelete);
             }
+            addHeader(Headers.END_DECRYPT);
+            addHeader(Headers.SERVICE_USERNAME);
         } catch (SQLException e) {
             printErrorMessage("error while fetching accounts for service for user", e);
         }
@@ -455,12 +457,9 @@ class ServerThread implements Runnable {
         } catch (SQLException e) {
             printErrorMessage("error while deleting account for user", e);
         }
-        /*
-         * DELETE FROM users_accounts WHERE service = ? AND service_username = ?
-         */
         System.out.println(getHour() + " [INFO] " + getSocketAddress() + " rows affected: " + rowsAffected);
         addHeader(Headers.DEFAULT);
-        payload.add("account " + accountToDelete + "@" + serviceToDelete + " removed successfully");
+        payload.add(serviceToDelete + " account removed successfully");
     }
 
     // generate random salt for password storing

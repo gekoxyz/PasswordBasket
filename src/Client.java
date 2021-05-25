@@ -83,6 +83,7 @@ public class Client {
         // conversazione lato client
         while (active) {
             getServerMessages();
+            System.out.println(messages);
             handleHeader();
             for (String msg : messages) {
                 System.out.println(msg);
@@ -90,7 +91,6 @@ public class Client {
             messages.clear();
             handleInputModifier();
         }
-
     }
 
     // PBKDF2
@@ -132,6 +132,9 @@ public class Client {
         inputModifier = messages.remove(headerLength);
         while (headerLength > 0) {
             preamble = messages.remove(0);
+            System.out.println("header length is > 0 and so we need to parse its contents");
+            System.out.println(preamble);
+            System.out.println(headerLength);
             headerLength--;
             switch (preamble) {
                 case Headers.SALT:
@@ -144,6 +147,9 @@ public class Client {
                     break;
                 case Headers.SERVICE_DECRYPT:
                     serviceDecrypt();
+                    break;
+                case Headers.USERNAME_DECRYPT:
+                    usernameDecrypt();
                     break;
                 default:
                     break;
@@ -164,7 +170,8 @@ public class Client {
             while (!messages.get(0).equals(Headers.END_DECRYPT)) {
                 if (toDecrypt % 2 == 0) {
                     decryptedPasswordsNumber++;
-                    System.out.print(decryptedPasswordsNumber + ". " + messages.remove(0) + " -> ");
+                    System.out.print(decryptedPasswordsNumber + ". "
+                            + new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))) + " -> ");
                 } else {
                     decryptedPasswords.add(new String(cipher.doFinal(Converter.hexToBytes(messages.get(0)))));
                     System.out.println(new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
@@ -190,6 +197,26 @@ public class Client {
         } else {
             System.out.println("password not copied to the clipboard!");
         }
+    }
+
+    private void usernameDecrypt() {
+        System.out.println(messages.remove(0));
+        headerLength--;
+        try {
+            cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
+            System.out.println("1st cycle: " + messages);
+            while (!messages.get(0).equals(Headers.END_DECRYPT)) {
+                System.out.println("[poss] -> " + messages);
+                System.out.println(new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
+                headerLength--;
+                System.out.println(headerLength);
+            }
+        } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
+            System.out.println("invalid decryption initialization");
+        }
+        System.out.println(headerLength);
+        headerLength--;
+        System.out.println(headerLength);
         messages.remove(0);
     }
 
@@ -206,6 +233,9 @@ public class Client {
                     break;
                 case Headers.PASSWORD:
                     insertPassword();
+                    break;
+                case Headers.SERVICE_USERNAME:
+                    insertServiceUsername();
                     break;
                 case Headers.SERVICE_PASSWORD:
                     insertServicePassword();
@@ -238,6 +268,24 @@ public class Client {
         send(Converter.bytesToHex(loginPassword));
     }
 
+    private void encryptData(String toEncrypt) {
+        // setting cipher in encrypt mode
+        try {
+            cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
+            String encryptedCipher = Converter.bytesToHex(cipher.doFinal(toEncrypt.getBytes()));
+            System.out.println(encryptedCipher);
+            send(encryptedCipher);
+        } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
+            System.out
+                    .println(getHour() + " [ERROR] " + getSocketAddress() + " error while encrypting service password");
+        }
+    }
+
+    private void insertServiceUsername() {
+        String serviceUsername = scan.nextLine();
+        encryptData(serviceUsername);
+    }
+
     private void insertServicePassword() {
         System.out.println("do you want to use a randomly generated password? (y/n)");
         if (scan.nextLine().equals("y")) {
@@ -247,16 +295,7 @@ public class Client {
             System.out.print("input your password: ");
             password = new String(console.readPassword());
         }
-        // setting cipher in encrypt mode
-        try {
-            cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
-            String encryptedCipher = Converter.bytesToHex(cipher.doFinal(password.getBytes()));
-            System.out.println(encryptedCipher);
-            send(encryptedCipher);
-        } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
-            System.out
-                    .println(getHour() + " [ERROR] " + getSocketAddress() + " error while encrypting service password");
-        }
+        encryptData(password);
     }
 
     private String getHour() {

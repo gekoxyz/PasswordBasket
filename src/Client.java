@@ -200,10 +200,6 @@ public class Client {
                     message = scan.nextLine();
                     send(message);
                     break;
-                case Headers.USERNAME:
-                    username = scan.nextLine();
-                    send(username);
-                    break;
                 case Headers.MAIL:
                     mail = scan.nextLine();
                     send(mail);
@@ -268,6 +264,6 @@ public class Client {
     }
 
     private String getSocketAddress() {
-        return socket.getLocalAddress() + ":" + socket.getLocalPort();
+        return socket.getInetAddress().getHostAddress() + ":" + socket.getLocalPort();
     }
 }

@@ -9,9 +9,9 @@ public class Server {
     public Server() {
         try {
             server = new ServerSocket(10000);
-            System.out.println(getHour() + " [INFO] server attivo");
+            System.out.println(getHour() + " [INFO] server active on port " + getSocketPort());
         } catch (IOException e) {
-            System.out.println(e);
+            printErrorMessage("error during server initialization", e);
         }
     }
 
@@ -27,12 +27,21 @@ public class Server {
                 new Thread(new ServerThread(clientRequest)).start();
             }
         } catch (IOException e) {
-            System.out.println(e);
+            printErrorMessage("error occurred while accepting a new client", e);
         }
     }
 
     private String getHour() {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
         return new String(LocalTime.now().format(dtf));
+    }
+
+    private int getSocketPort() {
+        return server.getLocalPort();
+    }
+
+    private void printErrorMessage(String message, Exception e) {
+        System.out.println(getHour() + " [ERROR] " + getSocketPort() + " " + message + " " + e);
+        System.out.println("interrupting thread");
     }
 }

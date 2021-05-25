@@ -159,7 +159,7 @@ class ServerThread implements Runnable {
                 System.out.println(getHour() + " [DEBUG] " + getSocketAddress()
                         + " mail does not exists, available for the registration");
                 mailToRegister = valueToCheck;
-                addHeader(Headers.USERNAME);
+                addHeader(Headers.DEFAULT);
                 payload.add("valid mail!");
                 invalidMail = false;
             }
@@ -173,7 +173,7 @@ class ServerThread implements Runnable {
             if (usernameExists) {
                 System.out.println(getHour() + " [DEBUG] " + getSocketAddress()
                         + " username exists, not available for the registration");
-                addHeader(Headers.USERNAME);
+                addHeader(Headers.DEFAULT);
                 payload.add("sorry, username is taken :(");
             } else {
                 System.out.println(getHour() + " [DEBUG] " + getSocketAddress()
@@ -214,7 +214,7 @@ class ServerThread implements Runnable {
 
     private void login() {
         System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " client selected login");
-        addHeader(Headers.USERNAME);
+        addHeader(Headers.DEFAULT);
         payload.add("you selected login");
         invalidUsername = true;
         while (invalidUsername) {
@@ -225,7 +225,7 @@ class ServerThread implements Runnable {
             if (!usernameExists) {
                 System.out.println(
                         getHour() + " [DEBUG] " + getSocketAddress() + " username doesn't exist, invalid operation");
-                addHeader(Headers.USERNAME);
+                addHeader(Headers.DEFAULT);
                 payload.add("input username is not valid");
             } else {
                 System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " username exists, valid operation");
@@ -404,13 +404,13 @@ class ServerThread implements Runnable {
             while (rs.next()) {
                 String serviceUsername = rs.getString("service_username");
                 String servicePassword = rs.getString("service_password");
-                payload.add(serviceUsername);
-                payload.add(servicePassword);
+                addHeader(serviceUsername);
+                addHeader(servicePassword);
                 System.out.println(getHour() + " [INFO] " + getSocketAddress() + " sending to user ");
                 System.out.println(getHour() + " [INFO] " + getSocketAddress() + " username:" + serviceUsername);
                 System.out.println(getHour() + " [INFO] " + getSocketAddress() + " password:" + servicePassword);
             }
-            payload.add(Headers.END_DECRYPT);
+            addHeader(Headers.END_DECRYPT);
             addHeader(Headers.DEFAULT);
         } catch (SQLException e) {
             printErrorMessage("exception while getting service account", e);
@@ -443,7 +443,7 @@ class ServerThread implements Runnable {
         }
         send();
         String accountToDelete = getUserInput();
-        System.out.println("[INFO] user wants to remove " + accountToDelete);
+        System.out.println(getHour() + " [INFO] " + getSocketAddress() + " user wants to remove " + accountToDelete);
         int rowsAffected = 0;
         try {
             preparedStatement = dbConnection.prepareStatement(
@@ -481,7 +481,7 @@ class ServerThread implements Runnable {
     }
 
     private String getSocketAddress() {
-        return socket.getLocalAddress() + ":" + socket.getPort();
+        return socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
     }
 
     private void printErrorMessage(String message, Exception e) {

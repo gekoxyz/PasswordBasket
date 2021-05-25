@@ -2,7 +2,6 @@ public final class Headers {
     public static final String DEFAULT = "DEFAULT";
     public static final String NO_OPERATIONS = "NO_OPERATIONS";
     public static final String MAIL = "MAIL";
-    public static final String USERNAME = "USERNAME";
     public static final String SALT = "SALT";
     public static final String PASSWORD = "PASSWORD";
     public static final String STORED_MAIL = "STORED_MAIL";

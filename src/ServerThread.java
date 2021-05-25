@@ -404,6 +404,7 @@ class ServerThread implements Runnable {
             rs = preparedStatement.executeQuery();
             System.out.println(getHour() + " [INFO] " + getSocketAddress() + " got results. printing to messages");
             addHeader(Headers.CREDENTIALS_DECRYPT);
+            addHeader(Headers.START_DECRYPT);
             while (rs.next()) {
                 String serviceUsername = rs.getString("service_username");
                 String servicePassword = rs.getString("service_password");

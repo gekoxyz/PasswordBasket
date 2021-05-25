@@ -83,7 +83,6 @@ public class Client {
         // conversazione lato client
         while (active) {
             getServerMessages();
-            System.out.println(messages);
             handleHeader();
             for (String msg : messages) {
                 System.out.println(msg);
@@ -155,6 +154,8 @@ public class Client {
     }
 
     private void credentialsDecrypt() {
+        messages.remove(0);
+        headerLength--;
         try {
             cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
         } catch (InvalidKeyException e1) {

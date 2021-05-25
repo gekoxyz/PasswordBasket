@@ -35,7 +35,6 @@ public class Client {
     private List<String> messages = new ArrayList<String>();
     private String salt = "";
     private String message = "";
-    private String username = "";
     private String password = "";
     private Console console = System.console();
     private byte[] vaultKey = null;
@@ -46,6 +45,7 @@ public class Client {
     private String mail = "";
     private Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
     private int headerLength;
+    private String toEncrypt;
 
     public Client() {
         try {
@@ -83,7 +83,6 @@ public class Client {
         // conversazione lato client
         while (active) {
             getServerMessages();
-            System.out.println(messages);
             handleHeader();
             for (String msg : messages) {
                 System.out.println(msg);
@@ -132,9 +131,6 @@ public class Client {
         inputModifier = messages.remove(headerLength);
         while (headerLength > 0) {
             preamble = messages.remove(0);
-            System.out.println("header length is > 0 and so we need to parse its contents");
-            System.out.println(preamble);
-            System.out.println(headerLength);
             headerLength--;
             switch (preamble) {
                 case Headers.SALT:
@@ -204,19 +200,14 @@ public class Client {
         headerLength--;
         try {
             cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
-            System.out.println("1st cycle: " + messages);
             while (!messages.get(0).equals(Headers.END_DECRYPT)) {
-                System.out.println("[poss] -> " + messages);
                 System.out.println(new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
                 headerLength--;
-                System.out.println(headerLength);
             }
         } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
             System.out.println("invalid decryption initialization");
         }
-        System.out.println(headerLength);
         headerLength--;
-        System.out.println(headerLength);
         messages.remove(0);
     }
 
@@ -234,8 +225,9 @@ public class Client {
                 case Headers.PASSWORD:
                     insertPassword();
                     break;
-                case Headers.SERVICE_USERNAME:
-                    insertServiceUsername();
+                case Headers.ENCRYPTED_DATA:
+                    toEncrypt = scan.nextLine();
+                    encryptData(toEncrypt);
                     break;
                 case Headers.SERVICE_PASSWORD:
                     insertServicePassword();
@@ -269,21 +261,14 @@ public class Client {
     }
 
     private void encryptData(String toEncrypt) {
-        // setting cipher in encrypt mode
         try {
             cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
             String encryptedCipher = Converter.bytesToHex(cipher.doFinal(toEncrypt.getBytes()));
-            System.out.println(encryptedCipher);
             send(encryptedCipher);
         } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
             System.out
                     .println(getHour() + " [ERROR] " + getSocketAddress() + " error while encrypting service password");
         }
-    }
-
-    private void insertServiceUsername() {
-        String serviceUsername = scan.nextLine();
-        encryptData(serviceUsername);
     }
 
     private void insertServicePassword() {

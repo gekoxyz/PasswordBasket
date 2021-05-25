@@ -333,12 +333,12 @@ class ServerThread implements Runnable {
         payload.add("what service do you want to add?");
         send();
         String service = getUserInput();
-        addHeader(Headers.SERVICE_USERNAME);
+        addHeader(Headers.ENCRYPTED_DATA);
         payload.add("what's the username for " + service + "?");
         send();
         String serviceUsername = getUserInput();
         addHeader(Headers.SERVICE_PASSWORD);
-        payload.add("what's the password for " + serviceUsername + "@" + service + "?");
+        payload.add("what's the password for this " + service + " username?");
         send();
         String servicePassword = getUserInput();
         addServiceAccountQuery(service, serviceUsername, servicePassword);
@@ -439,7 +439,7 @@ class ServerThread implements Runnable {
                         + serviceToDelete);
             }
             addHeader(Headers.END_DECRYPT);
-            addHeader(Headers.SERVICE_USERNAME);
+            addHeader(Headers.ENCRYPTED_DATA);
         } catch (SQLException e) {
             printErrorMessage("error while fetching accounts for service for user", e);
         }

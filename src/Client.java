@@ -23,16 +23,17 @@ import java.util.Scanner;
 public class Client {
     private Socket socket;
 
-    private boolean active = true;
     private OutputStream outputStream;
     private ObjectOutputStream objectOutputStream;
     private InputStream inputStream;
     private ObjectInputStream objectInputStream;
-
-    private List<String> messages = new ArrayList<String>();
-    private Cipher cipher;
-    private String salt = "";
     private Scanner scan = new Scanner(System.in);
+
+    private DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private boolean active = true;
+    private Cipher cipher;
+    private List<String> messages = new ArrayList<String>();
+    private String salt = "";
     private String message = "";
     private String username = "";
     private String password = "";
@@ -44,6 +45,7 @@ public class Client {
     private String inputModifier = "";
     private String mail = "";
     private Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+    private int headerLength;
 
     public Client() {
         try {
@@ -72,6 +74,7 @@ public class Client {
         System.out.println(" | |_) / _` / __/ __\\ \\ /\\ / / _ \\| '__/ _` |  _ \\ / _` / __| |/ / _ \\ __|");
         System.out.println(" |  __/ (_| \\__ \\__ \\\\ V  V / (_) | | | (_| | |_) | (_| \\__ \\   <  __/ |_ ");
         System.out.println(" |_|   \\__,_|___/___/ \\_/\\_/ \\___/|_|  \\__,_|____/ \\__,_|___/_|\\_\\___|\\__|");
+        System.out.println();
         Client client = new Client();
         client.run();
     }
@@ -80,141 +83,26 @@ public class Client {
         // conversazione lato client
         while (active) {
             getServerMessages();
-            int headerLength = Integer.parseInt(messages.remove(0));
-            headerLength--;
-            inputModifier = messages.remove(headerLength);
-            while (headerLength > 0) {
-                preamble = messages.remove(0);
-                headerLength--;
-                switch (preamble) {
-                    case Headers.SALT:
-                        salt = messages.remove(0);
-                        System.out.println(getHour() + " [INFO] " + getSocketAddress() + " got the salt " + salt);
-                        headerLength--;
-                        break;
-                    case Headers.STORED_MAIL:
-                        mail = messages.remove(0);
-                        System.out.println(getHour() + " [INFO] " + getSocketAddress()
-                                + " got the mail associated to this account " + mail);
-                        headerLength--;
-                        break;
-                    case Headers.SERVICE_DECRYPT:
-                        // decrypt
-                        // setto il cipher in modalita` decrypt
-                        try {
-                            cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
-                        } catch (InvalidKeyException e1) {
-                            System.out.println("invalid decryption initialization");
-                        }
-                        int toDecrypt = 0;
-                        int decryptedPasswordsNumber = 0;
-                        List<String> decryptedPasswords = new ArrayList<String>();
-                        try {
-                            while (!messages.get(0).equals(Headers.END_DECRYPT)) {
-                                if (toDecrypt % 2 == 0) {
-                                    decryptedPasswordsNumber++;
-                                    System.out.print(decryptedPasswordsNumber + ". " + messages.remove(0) + " -> ");
-                                } else {
-                                    decryptedPasswords
-                                            .add(new String(cipher.doFinal(Converter.hexToBytes(messages.get(0)))));
-                                    System.out.println(
-                                            new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
-                                }
-                                toDecrypt++;
-                                headerLength--;
-                            }
-                        } catch (IllegalBlockSizeException | BadPaddingException e) {
-                            System.out.println("invalid decryption" + e);
-                        }
-                        if (decryptedPasswordsNumber == 1) {
-                            System.out.println("input 1 to copy the password to the clipboard (n to skip)");
-                        } else {
-                            System.out.println("input 1-" + decryptedPasswordsNumber
-                                    + " to copy a password to the clipboard. (n to skip)");
-                        }
-                        String passwordToCopy = scan.nextLine();
-                        if (!passwordToCopy.equals("n")) {
-                            StringSelection selection = new StringSelection(
-                                    decryptedPasswords.get(Integer.parseInt(passwordToCopy) - 1));
-                            clipboard.setContents(selection, null);
-                            System.out.println("password copied to the clipboard!");
-                        } else {
-                            System.out.println("password not copied to the clipboard!");
-                        }
-                        messages.remove(0);
-                        break;
-                    default:
-                        break;
-                }
-            }
+            handleHeader();
             for (String msg : messages) {
                 System.out.println(msg);
             }
             messages.clear();
-            try {
-                switch (inputModifier) {
-                    case Headers.DEFAULT:
-                        message = scan.nextLine();
-                        send(message);
-                        break;
-                    case Headers.USERNAME:
-                        username = scan.nextLine();
-                        send(username);
-                        break;
-                    case Headers.MAIL:
-                        mail = scan.nextLine();
-                        send(mail);
-                        break;
-                    case Headers.PASSWORD:
-                        password = new String(console.readPassword());
-                        // hashing vault key + pass to get the login password
-                        // hash(vaultKey+pass)
-                        // hash(hash(user+pass)+pass)
-                        vaultKey = pbkdf2(password + mail, salt);
-                        System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " vault key: "
-                                + Converter.bytesToHex(vaultKey));
-                        loginPassword = pbkdf2(Converter.bytesToHex(vaultKey) + password, salt);
-                        System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " auth key: "
-                                + Converter.bytesToHex(loginPassword));
-                        aesVaultKey = new SecretKeySpec(vaultKey, "AES");
-                        System.out.println(getHour() + " [SECRETKEY] " + getSocketAddress() + " " + aesVaultKey);
-                        send(Converter.bytesToHex(loginPassword));
-                        break;
-                    case Headers.SERVICE_PASSWORD:
-                        System.out.println("do you want to use a randomly generated password? (y/n)");
-                        if (scan.nextLine().equals("y")) {
-                            password = PasswordGenerator.generateRandomPassword();
-                            System.out.println("generated the random password: " + password);
-                        } else {
-                            System.out.print("input your password: ");
-                            password = new String(console.readPassword());
-                        }
-                        // setto il cipher in modalita` encrypt
-                        cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
-                        String encryptedCipher = Converter.bytesToHex(cipher.doFinal(password.getBytes()));
-                        // ENCRYPTED CIPHER
-                        System.out.println(encryptedCipher);
-                        send(encryptedCipher);
-                        break;
-                    case Headers.NO_OPERATIONS:
-                        System.out.println("goodbye!");
-                        break;
-                    default:
-                        break;
-                }
-            } catch (Exception e) {
-                System.out.println("EXCEPTION IO");
-            }
-            preamble = "";
-            inputModifier = "";
+            handleInputModifier();
         }
+
     }
 
     // PBKDF2
-    public static byte[] pbkdf2(String password, String salt) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt.getBytes(), 10000, 256);
-        SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        return f.generateSecret(spec).getEncoded();
+    public byte[] pbkdf2(String password, String salt) {
+        try {
+            KeySpec keySpec = new PBEKeySpec(password.toCharArray(), salt.getBytes(), 10000, 256);
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            return factory.generateSecret(keySpec).getEncoded();
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " error while hashing the password " + e);
+            return null;
+        }
     }
 
     // send message to the server and reset the stream
@@ -229,10 +117,8 @@ public class Client {
 
     private List<String> getServerMessages() {
         try {
-            System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " waiting for server message");
+            System.out.println(getHour() + " [INFO] " + getSocketAddress() + " waiting for server message");
             messages = (List<String>) objectInputStream.readObject();
-            // System.out.println("Received [" + (messages.size()) + "] messages from: " +
-            // socket);
         } catch (ClassNotFoundException | IOException e) {
             System.out.println(getHour() + " [ERROR] " + getSocketAddress()
                     + " error while receiving messages from the server " + e);
@@ -240,9 +126,145 @@ public class Client {
         return messages;
     }
 
+    private void handleHeader() {
+        headerLength = Integer.parseInt(messages.remove(0));
+        headerLength--;
+        inputModifier = messages.remove(headerLength);
+        while (headerLength > 0) {
+            preamble = messages.remove(0);
+            headerLength--;
+            switch (preamble) {
+                case Headers.SALT:
+                    salt = messages.remove(0);
+                    headerLength--;
+                    break;
+                case Headers.STORED_MAIL:
+                    mail = messages.remove(0);
+                    headerLength--;
+                    break;
+                case Headers.SERVICE_DECRYPT:
+                    serviceDecrypt();
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void serviceDecrypt() {
+        try {
+            cipher.init(Cipher.DECRYPT_MODE, aesVaultKey);
+        } catch (InvalidKeyException e1) {
+            System.out.println("invalid decryption initialization");
+        }
+        int toDecrypt = 0;
+        int decryptedPasswordsNumber = 0;
+        List<String> decryptedPasswords = new ArrayList<String>();
+        try {
+            while (!messages.get(0).equals(Headers.END_DECRYPT)) {
+                if (toDecrypt % 2 == 0) {
+                    decryptedPasswordsNumber++;
+                    System.out.print(decryptedPasswordsNumber + ". " + messages.remove(0) + " -> ");
+                } else {
+                    decryptedPasswords.add(new String(cipher.doFinal(Converter.hexToBytes(messages.get(0)))));
+                    System.out.println(new String(cipher.doFinal(Converter.hexToBytes(messages.remove(0)))));
+                }
+                toDecrypt++;
+                headerLength--;
+            }
+        } catch (IllegalBlockSizeException | BadPaddingException e) {
+            System.out.println("invalid decryption" + e);
+        }
+        if (decryptedPasswordsNumber == 1) {
+            System.out.println("input 1 to copy the password to the clipboard (n to skip)");
+        } else {
+            System.out.println(
+                    "input 1-" + decryptedPasswordsNumber + " to copy a password to the clipboard. (n to skip)");
+        }
+        String passwordToCopy = scan.nextLine();
+        if (!passwordToCopy.equals("n")) {
+            StringSelection selection = new StringSelection(
+                    decryptedPasswords.get(Integer.parseInt(passwordToCopy) - 1));
+            clipboard.setContents(selection, null);
+            System.out.println("password copied to the clipboard!");
+        } else {
+            System.out.println("password not copied to the clipboard!");
+        }
+        messages.remove(0);
+    }
+
+    private void handleInputModifier() {
+        try {
+            switch (inputModifier) {
+                case Headers.DEFAULT:
+                    message = scan.nextLine();
+                    send(message);
+                    break;
+                case Headers.USERNAME:
+                    username = scan.nextLine();
+                    send(username);
+                    break;
+                case Headers.MAIL:
+                    mail = scan.nextLine();
+                    send(mail);
+                    break;
+                case Headers.PASSWORD:
+                    insertPassword();
+                    break;
+                case Headers.SERVICE_PASSWORD:
+                    insertServicePassword();
+                    break;
+                case Headers.NO_OPERATIONS:
+                    System.out.println("goodbye!");
+                    break;
+                default:
+                    break;
+            }
+        } catch (Exception e) {
+            System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " IO exception");
+        }
+        inputModifier = "";
+    }
+
+    private void insertPassword() {
+        password = new String(console.readPassword());
+        // hashing vault key + pass to get the login password
+        // hash(vaultKey+pass)
+        // hash(hash(user+pass)+pass)
+        vaultKey = pbkdf2(password + mail, salt);
+        System.out.println(
+                getHour() + " [DEBUG] " + getSocketAddress() + " vault key: " + Converter.bytesToHex(vaultKey));
+        loginPassword = pbkdf2(Converter.bytesToHex(vaultKey) + password, salt);
+        System.out.println(
+                getHour() + " [DEBUG] " + getSocketAddress() + " auth key: " + Converter.bytesToHex(loginPassword));
+        aesVaultKey = new SecretKeySpec(vaultKey, "AES");
+        System.out.println(getHour() + " [SECRETKEY] " + getSocketAddress() + " " + aesVaultKey);
+        send(Converter.bytesToHex(loginPassword));
+    }
+
+    private void insertServicePassword() {
+        System.out.println("do you want to use a randomly generated password? (y/n)");
+        if (scan.nextLine().equals("y")) {
+            password = PasswordGenerator.generateRandomPassword();
+            System.out.println("generated the random password: " + password);
+        } else {
+            System.out.print("input your password: ");
+            password = new String(console.readPassword());
+        }
+        // setting cipher in encrypt mode
+        try {
+            cipher.init(Cipher.ENCRYPT_MODE, aesVaultKey);
+            String encryptedCipher = Converter.bytesToHex(cipher.doFinal(password.getBytes()));
+            System.out.println(encryptedCipher);
+            send(encryptedCipher);
+        } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
+            System.out
+                    .println(getHour() + " [ERROR] " + getSocketAddress() + " error while encrypting service password");
+        }
+    }
+
     private String getHour() {
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
-        return new String(LocalTime.now().format(dtf));
+        return new String(LocalTime.now().format(dateTimeFormatter));
     }
 
     private String getSocketAddress() {

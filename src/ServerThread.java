@@ -26,6 +26,7 @@ class ServerThread implements Runnable {
     private ObjectOutputStream objectOutputStream;
     private InputStream inputStream;
     private ObjectInputStream objectInputStream;
+    private DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private List<String> payload = new ArrayList<String>();
     private List<String> header = new ArrayList<String>();
@@ -43,8 +44,6 @@ class ServerThread implements Runnable {
 
     public ServerThread(Socket richiestaClient) {
         try {
-            // aggiungere messaggi cosi` formattati: 2015-11-10 15:26:57 4348 [Note] Server
-            // socket created on IP: '::'.
             socket = richiestaClient;
             System.out.println(getHour() + " [INFO] " + getSocketAddress() + " connected ");
             dbConnection = connectToDatabase();
@@ -63,18 +62,17 @@ class ServerThread implements Runnable {
             // define MessageDigest class algorithm
             messageDigest = MessageDigest.getInstance("SHA-256");
         } catch (IOException | NoSuchAlgorithmException e) {
-            // non puo` uscire un NoSuchAlgorithmException perche` so che l'algoritmo esiste
-            // ed e` cosi` definito
-            System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " errore di i/o");
+            printErrorMessage("initialization error", e);
         }
     }
 
+    @Override
     public void run() {
         // conversazione lato server
         String command;
         while (active) {
             addHeader(Headers.DEFAULT);
-            payload.add("== Cosa vuoi fare? ==");
+            payload.add("== What action do you want to perform? ==");
             payload.add("1. Login");
             payload.add("2. Register");
             payload.add("3. Credits");
@@ -84,10 +82,10 @@ class ServerThread implements Runnable {
             // -- SELECT CASE FOR USER LOGIN/REGISTER --
             switch (command) {
                 case "1":
-                    login(dbConnection);
+                    login();
                     break;
                 case "2":
-                    register(dbConnection);
+                    register();
                     break;
                 case "3":
                     payload.add("function not yet implemented");
@@ -105,16 +103,14 @@ class ServerThread implements Runnable {
 
     // connessione al database
     private Connection connectToDatabase() {
-        Connection connection = null;
         System.out.println(getHour() + " [INFO] " + getSocketAddress() + " Intializing database connection");
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/passwordbasket", "root", "");
+            return DriverManager.getConnection("jdbc:mysql://localhost:3306/passwordbasket", "root", "");
         } catch (SQLException | ClassNotFoundException e) {
-            System.out.println(getHour() + " [ERROR] " + getSocketAddress()
-                    + " errore nella connessione al database classnotfound/sql " + e);
+            printErrorMessage("errore nella connessione al database classnotfound/sql ", e);
+            return null;
         }
-        return connection;
     }
 
     // resetto la stream, scrivo l'oggetto e pulisco la lista di messaggi
@@ -130,7 +126,7 @@ class ServerThread implements Runnable {
             header.clear();
             headerLength = 0;
         } catch (IOException e) {
-            System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " error occurred while sending message");
+            printErrorMessage("error occurred while sending message", e);
         }
     }
 
@@ -138,14 +134,12 @@ class ServerThread implements Runnable {
         try {
             return (String) objectInputStream.readObject();
         } catch (ClassNotFoundException | IOException e) {
-            System.out
-                    .println(getHour() + " [ERROR] " + getSocketAddress() + " error while reading String from client");
-            active = false;
+            printErrorMessage("error while reading String from client", e);
+            return null;
         }
-        return "";
     }
 
-    private void register(Connection dbConnection) {
+    private void register() {
         String usernameToRegister = "";
         String mailToRegister = "";
         boolean invalidMail = true;
@@ -208,7 +202,6 @@ class ServerThread implements Runnable {
             preparedStatement.setString(3, salt);
             // name
             preparedStatement.setString(4, mailToRegister);
-            // TODO: if rows affected = 0 throw login error
             int rowsAffected = preparedStatement.executeUpdate();
             System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " rows affected: " + rowsAffected);
         } catch (SQLException e) {
@@ -219,7 +212,7 @@ class ServerThread implements Runnable {
         payload.add("type 1 to authenticate");
     }
 
-    private void login(Connection dbConnection) {
+    private void login() {
         System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " client selected login");
         addHeader(Headers.USERNAME);
         payload.add("you selected login");
@@ -297,7 +290,7 @@ class ServerThread implements Runnable {
                 return true;
             }
         } catch (SQLException e) {
-            System.out.println("ERROR WHILE CHECKING FIELD EXISTANCE. FIELD: " + field + " " + e);
+            System.out.println("error while checking field existance. field: " + field + " " + e);
             return false;
         }
     }
@@ -305,7 +298,7 @@ class ServerThread implements Runnable {
     private void loggedInOptions() {
         boolean activeLogin = true;
         while (activeLogin) {
-            payload.add("what do you want to do?");
+            payload.add("== What do you want to do? ==");
             payload.add("1. Register a service");
             payload.add("2. Get the passwords for a service");
             payload.add("3. Remove a service");
@@ -350,7 +343,7 @@ class ServerThread implements Runnable {
         String servicePassword = getUserInput();
         addServiceAccountQuery(service, serviceUsername, servicePassword);
         addHeader(Headers.DEFAULT);
-        payload.add("account aggiunto con successo");
+        payload.add("account added successfully!");
     }
 
     private void addServiceAccountQuery(String service, String serviceUsername, String servicePassword) {
@@ -366,8 +359,7 @@ class ServerThread implements Runnable {
                     + serviceUsername + " " + servicePassword + " " + username);
             rowsAffected = preparedStatement.executeUpdate();
         } catch (SQLException e) {
-            System.out.println(
-                    getHour() + " [ERROR] " + getSocketAddress() + " error while entering the account in the database");
+            printErrorMessage("error while entering the account in the database", e);
         }
         System.out.println(getHour() + " [DEBUG] add service query successful. rows affected:" + rowsAffected);
     }
@@ -385,8 +377,7 @@ class ServerThread implements Runnable {
                 payload.add(service);
             }
         } catch (SQLException e1) {
-            System.out.println(
-                    getHour() + " [ERROR] " + getSocketAddress() + " error while getting services for user " + e1);
+            printErrorMessage("error while getting services for user", e1);
         }
         send();
         return getUserInput();
@@ -404,8 +395,9 @@ class ServerThread implements Runnable {
                     .prepareStatement("SELECT * FROM user_accounts WHERE service = ? AND username = ?");
             preparedStatement.setString(1, serviceToGet);
             preparedStatement.setString(2, username);
-            System.out.println("SELECT * FROM user_accounts WHERE service = '" + serviceToGet + "' AND username = '"
-                    + username + "'");
+            System.out.println(
+                    getHour() + " [INFO] " + getSocketAddress() + " SELECT * FROM user_accounts WHERE service = '"
+                            + serviceToGet + "' AND username = '" + username + "'");
             rs = preparedStatement.executeQuery();
             System.out.println(getHour() + " [INFO] " + getSocketAddress() + " got results. printing to messages");
             addHeader(Headers.SERVICE_DECRYPT);
@@ -415,14 +407,13 @@ class ServerThread implements Runnable {
                 payload.add(serviceUsername);
                 payload.add(servicePassword);
                 System.out.println(getHour() + " [INFO] " + getSocketAddress() + " sending to user ");
-                System.out.println("username:" + serviceUsername);
-                System.out.println("password:" + servicePassword);
+                System.out.println(getHour() + " [INFO] " + getSocketAddress() + " username:" + serviceUsername);
+                System.out.println(getHour() + " [INFO] " + getSocketAddress() + " password:" + servicePassword);
             }
             payload.add(Headers.END_DECRYPT);
             addHeader(Headers.DEFAULT);
         } catch (SQLException e) {
-            System.out.println(
-                    getHour() + " [ERROR] " + getSocketAddress() + " exception while getting service account " + e);
+            printErrorMessage("exception while getting service account", e);
         }
     }
 
@@ -444,10 +435,11 @@ class ServerThread implements Runnable {
                 String serviceUsername = rs.getString("service_username");
                 payload.add(serviceUsername);
                 System.out.println(getHour() + " [INFO] " + getSocketAddress() + " sending to user ");
-                System.out.println("username:" + serviceUsername + "@" + serviceToDelete);
+                System.out.println(getHour() + " [INFO] " + getSocketAddress() + " username:" + serviceUsername + "@"
+                        + serviceToDelete);
             }
         } catch (SQLException e) {
-            System.out.println(getHour() + " [ERROR] error while fetching accounts for service for user " + e);
+            printErrorMessage("error while fetching accounts for service for user", e);
         }
         send();
         String accountToDelete = getUserInput();
@@ -461,8 +453,7 @@ class ServerThread implements Runnable {
             preparedStatement.setString(3, username);
             rowsAffected = preparedStatement.executeUpdate();
         } catch (SQLException e) {
-            System.out.println(
-                    getHour() + " [ERROR] " + getSocketAddress() + " error while deleting account for user " + e);
+            printErrorMessage("error while deleting account for user", e);
         }
         /*
          * DELETE FROM users_accounts WHERE service = ? AND service_username = ?
@@ -486,11 +477,16 @@ class ServerThread implements Runnable {
     }
 
     private String getHour() {
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
         return new String(LocalTime.now().format(dtf));
     }
 
     private String getSocketAddress() {
-        return socket.getLocalAddress() + ":" + socket.getLocalPort();
+        return socket.getLocalAddress() + ":" + socket.getPort();
+    }
+
+    private void printErrorMessage(String message, Exception e) {
+        System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " " + message + " " + e);
+        System.out.println("interrupting thread");
+        Thread.currentThread().stop();
     }
 }

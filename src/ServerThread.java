@@ -199,7 +199,7 @@ class ServerThread implements Runnable {
             int rowsAffected = preparedStatement.executeUpdate();
             printInfoMessage("rows affected: " + rowsAffected);
         } catch (SQLException e) {
-            e.printStackTrace();
+            printErrorMessage("error while inserting user into database", e);
         }
         addHeader(Headers.DEFAULT);
         payload.add("registration completed!");

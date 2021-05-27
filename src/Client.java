@@ -116,11 +116,10 @@ public class Client {
 
     private List<String> getServerMessages() {
         try {
-            System.out.println(getHour() + " [INFO] " + getSocketAddress() + " waiting for server message");
+            printInfoMessage("waiting for server message");
             messages = (List<String>) objectInputStream.readObject();
         } catch (ClassNotFoundException | IOException e) {
-            System.out.println(getHour() + " [ERROR] " + getSocketAddress()
-                    + " error while receiving messages from the server " + e);
+            printErrorMessage("error while receiving messages from the server", e);
         }
         return messages;
     }
@@ -294,7 +293,7 @@ public class Client {
     }
 
     private void printInfoMessage(String message) {
-        System.out.println(getHour() + " " + " [INFO] " + getSocketAddress() + " " + message);
+        System.out.println(getHour() + " [INFO] " + getSocketAddress() + " " + message);
     }
 
     private void printErrorMessage(String message, Exception e) {

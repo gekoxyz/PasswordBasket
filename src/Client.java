@@ -83,7 +83,6 @@ public class Client {
         // conversazione lato client
         while (active) {
             getServerMessages();
-            System.out.println(messages);
             handleHeader();
             for (String msg : messages) {
                 System.out.println(msg);
@@ -100,7 +99,7 @@ public class Client {
             SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
             return factory.generateSecret(keySpec).getEncoded();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-            System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " error while hashing the password " + e);
+            printErrorMessage("error while hashing the password ", e);
             return null;
         }
     }
@@ -245,7 +244,7 @@ public class Client {
                     break;
             }
         } catch (Exception e) {
-            System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " IO exception");
+            printErrorMessage("IO exception", e);
         }
         inputModifier = "";
     }
@@ -256,11 +255,9 @@ public class Client {
         // hash(vaultKey+pass)
         // hash(hash(user+pass)+pass)
         vaultKey = pbkdf2(password + mail, salt);
-        System.out.println(
-                getHour() + " [DEBUG] " + getSocketAddress() + " vault key: " + Converter.bytesToHex(vaultKey));
+        printInfoMessage("vault key: " + Converter.bytesToHex(vaultKey));
         loginPassword = pbkdf2(Converter.bytesToHex(vaultKey) + password, salt);
-        System.out.println(
-                getHour() + " [DEBUG] " + getSocketAddress() + " auth key: " + Converter.bytesToHex(loginPassword));
+        printInfoMessage("auth key: " + Converter.bytesToHex(loginPassword));
         aesVaultKey = new SecretKeySpec(vaultKey, "AES");
         System.out.println(getHour() + " [SECRETKEY] " + getSocketAddress() + " " + aesVaultKey);
         send(Converter.bytesToHex(loginPassword));
@@ -272,8 +269,7 @@ public class Client {
             String encryptedCipher = Converter.bytesToHex(cipher.doFinal(toEncrypt.getBytes()));
             send(encryptedCipher);
         } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
-            System.out
-                    .println(getHour() + " [ERROR] " + getSocketAddress() + " error while encrypting service password");
+            printErrorMessage("error while encrypting service password", e);
         }
     }
 
@@ -295,5 +291,13 @@ public class Client {
 
     private String getSocketAddress() {
         return socket.getInetAddress().getHostAddress() + ":" + socket.getLocalPort();
+    }
+
+    private void printInfoMessage(String message) {
+        System.out.println(getHour() + " " + " [INFO] " + getSocketAddress() + " " + message);
+    }
+
+    private void printErrorMessage(String message, Exception e) {
+        System.out.println(getHour() + " [ERROR] " + getSocketAddress() + " " + message + " " + e);
     }
 }

@@ -44,7 +44,7 @@ public class Client {
     private String inputModifier = "";
     private String mail = "";
     private Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-    private int headerLength;
+    private int headerLength = 0;
     private String toEncrypt;
 
     public Client() {
@@ -83,6 +83,7 @@ public class Client {
         // conversazione lato client
         while (active) {
             getServerMessages();
+            System.out.println(messages);
             handleHeader();
             for (String msg : messages) {
                 System.out.println(msg);
@@ -128,7 +129,8 @@ public class Client {
     private void handleHeader() {
         headerLength = Integer.parseInt(messages.remove(0));
         headerLength--;
-        inputModifier = messages.remove(headerLength);
+        inputModifier = messages.remove(headerLength - 1);
+        headerLength--;
         while (headerLength > 0) {
             preamble = messages.remove(0);
             headerLength--;

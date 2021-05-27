@@ -117,9 +117,9 @@ class ServerThread implements Runnable {
     private void send() {
         System.out.println(getHour() + " [DEBUG] " + getSocketAddress() + " sending data to client");
         try {
-            header.add(0, Integer.toString(headerLength));
+            header.add(0, Integer.toString(++headerLength));
             header.addAll(payload);
-            // System.out.println(header);
+            System.out.println(header);
             objectOutputStream.writeObject(header);
             objectOutputStream.reset();
             payload.clear();

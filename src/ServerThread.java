@@ -33,6 +33,7 @@ class ServerThread implements Runnable {
     private int headerLength = 0;
     private MessageDigest messageDigest;
 
+    private String name = "";
     private String username = "";
     private String password = "";
     private String salt = "";
@@ -187,15 +188,19 @@ class ServerThread implements Runnable {
         send();
         // get password and hash it
         hashedPassword = getHashedPassword();
+        addHeader(Headers.DEFAULT);
+        payload.add("insert your name and surname");
+        send();
+        name = getUserInput();
         try {
             // preparing insert query and executing it
             PreparedStatement preparedStatement = dbConnection.prepareStatement(
-                    "INSERT INTO user_login (username, password, salt, name, mail) VALUES (?, ?, ?, NULL, ?)");
+                    "INSERT INTO user_login (username, password, salt, name, mail) VALUES (?, ?, ?, ?, ?)");
             preparedStatement.setString(1, usernameToRegister);
             preparedStatement.setString(2, hashedPassword);
             preparedStatement.setString(3, salt);
-            // name
-            preparedStatement.setString(4, mailToRegister);
+            preparedStatement.setString(4, name);
+            preparedStatement.setString(5, mailToRegister);
             int rowsAffected = preparedStatement.executeUpdate();
             printInfoMessage("rows affected: " + rowsAffected);
         } catch (SQLException e) {

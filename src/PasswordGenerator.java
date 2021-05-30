@@ -11,8 +11,8 @@ public class PasswordGenerator {
     private static final String OTHER_PUNCTUATION = "!@#&()–[{}]:;',?/*";
     private static final String OTHER_SYMBOL = "~$^+=<>";
     private static final String OTHER_SPECIAL = OTHER_PUNCTUATION + OTHER_SYMBOL;
-    private static final int PASSWORD_LENGTH = 12;
     private static final String CHARS = CHAR_LOWERCASE + CHAR_UPPERCASE + DIGIT + OTHER_SPECIAL;
+    private static final int PASSWORD_LENGTH = 12;
 
     /*
      * generates a password with at least 
@@ -23,16 +23,11 @@ public class PasswordGenerator {
      */
     public static String generateRandomPassword() {
         StringBuilder result = new StringBuilder(PASSWORD_LENGTH);
-        String strLowerCase = generateRandomString(CHAR_LOWERCASE, 2);
-        result.append(strLowerCase);
-        String strUppercaseCase = generateRandomString(CHAR_UPPERCASE, 2);
-        result.append(strUppercaseCase);
-        String strDigit = generateRandomString(DIGIT, 2);
-        result.append(strDigit);
-        String strSpecialChar = generateRandomString(OTHER_SPECIAL, 2);
-        result.append(strSpecialChar);
-        String strOther = generateRandomString(CHARS, PASSWORD_LENGTH - 8);
-        result.append(strOther);
+        result.append(generateRandomString(CHAR_LOWERCASE, 2));
+        result.append(generateRandomString(CHAR_UPPERCASE, 2));
+        result.append(generateRandomString(DIGIT, 2));
+        result.append(generateRandomString(OTHER_SPECIAL, 2));
+        result.append(generateRandomString(CHARS, PASSWORD_LENGTH - 8));
         return shuffleString(shuffleString(result.toString()));
     }
 

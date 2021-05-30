@@ -104,7 +104,7 @@ class ServerThread implements Runnable {
 
     // connessione al database
     private Connection connectToDatabase() {
-        printInfoMessage(" Intializing database connection");
+        printInfoMessage("Intializing database connection");
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
             return DriverManager.getConnection("jdbc:mysql://localhost:3306/passwordbasket", "root", "");
@@ -331,11 +331,11 @@ class ServerThread implements Runnable {
         send();
         String service = getUserInput();
         addHeader(Headers.ENCRYPTED_DATA);
-        payload.add("what's the username for " + service + "?");
+        payload.add("what's the username for the service?");
         send();
         String serviceUsername = getUserInput();
         addHeader(Headers.SERVICE_PASSWORD);
-        payload.add("what's the password for this " + service + " username?");
+        payload.add("what's the password for this username?");
         send();
         String servicePassword = getUserInput();
         addServiceAccountQuery(service, serviceUsername, servicePassword);
@@ -357,7 +357,7 @@ class ServerThread implements Runnable {
         } catch (SQLException e) {
             printErrorMessage("error while entering the account in the database", e);
         }
-        printInfoMessage("[DEBUG] add service query successful. rows affected: " + rowsAffected);
+        printInfoMessage("add service query successful. rows affected: " + rowsAffected);
     }
 
     private String getServiceToManipulate() {
@@ -365,7 +365,7 @@ class ServerThread implements Runnable {
         ResultSet rs;
         try {
             preparedStatement = dbConnection
-                    .prepareStatement("SELECT service FROM user_accounts WHERE username = ? GROUP BY service");
+                    .prepareStatement("SELECT DISTINCT service FROM user_accounts WHERE username = ?");
             preparedStatement.setString(1, username);
             rs = preparedStatement.executeQuery();
             addHeader(Headers.START_DECRYPT);
@@ -375,8 +375,8 @@ class ServerThread implements Runnable {
             }
             addHeader(Headers.END_DECRYPT);
             addHeader(Headers.ENCRYPTED_DATA);
-        } catch (SQLException e1) {
-            printErrorMessage("error while getting services for user", e1);
+        } catch (SQLException e) {
+            printErrorMessage("error while getting services for user", e);
         }
         send();
         return getUserInput();
@@ -458,7 +458,7 @@ class ServerThread implements Runnable {
         }
         printInfoMessage("rows affected: " + Integer.toString(rowsAffected));
         addHeader(Headers.DEFAULT);
-        payload.add(serviceToDelete + " account removed successfully");
+        payload.add("account removed successfully");
     }
 
     // generate random salt for password storing
@@ -483,7 +483,7 @@ class ServerThread implements Runnable {
     }
 
     private void printInfoMessage(String message) {
-        System.out.println(getHour() + " " + " [INFO] " + getSocketAddress() + " " + message);
+        System.out.println(getHour() + " [INFO] " + getSocketAddress() + " " + message);
     }
 
     private void printErrorMessage(String message, Exception e) {

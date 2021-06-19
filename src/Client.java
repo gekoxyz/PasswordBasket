@@ -33,7 +33,6 @@ public class Client {
     private boolean active = true;
     private Cipher cipher;
     private List<String> messages = new ArrayList<String>();
-    private String salt = "";
     private String message = "";
     private String password = "";
     private Console console = System.console();
@@ -133,10 +132,6 @@ public class Client {
             preamble = messages.remove(0);
             headerLength--;
             switch (preamble) {
-                case Headers.SALT:
-                    salt = messages.remove(0);
-                    headerLength--;
-                    break;
                 case Headers.STORED_MAIL:
                     mail = messages.remove(0);
                     headerLength--;
@@ -253,9 +248,9 @@ public class Client {
         // hashing vault key + pass to get the login password
         // hash(vaultKey+pass)
         // hash(hash(user+pass)+pass)
-        vaultKey = pbkdf2(password + mail, salt);
+        vaultKey = pbkdf2(password, mail);
         printInfoMessage("vault key: " + Converter.bytesToHex(vaultKey));
-        loginPassword = pbkdf2(Converter.bytesToHex(vaultKey) + password, salt);
+        loginPassword = pbkdf2(Converter.bytesToHex(vaultKey), password);
         printInfoMessage("auth key: " + Converter.bytesToHex(loginPassword));
         aesVaultKey = new SecretKeySpec(vaultKey, "AES");
         System.out.println(getHour() + " [SECRETKEY] " + getSocketAddress() + " " + aesVaultKey);

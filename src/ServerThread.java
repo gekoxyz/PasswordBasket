@@ -175,9 +175,6 @@ class ServerThread implements Runnable {
             } else {
                 printInfoMessage("username does not exists, available for the registration");
                 usernameToRegister = valueToCheck;
-                addHeader(Headers.SALT);
-                salt = Converter.bytesToHex(generateSalt());
-                addHeader(salt);
                 addHeader(Headers.PASSWORD);
                 payload.add("username is not taken yet :)");
                 invalidUsername = false;
@@ -186,7 +183,8 @@ class ServerThread implements Runnable {
         printInfoMessage("username not taken, sending result to the client");
         payload.add("Input the password");
         send();
-        // get password and hash it
+        // get password and hash it with the newly generated salt
+        salt = Converter.bytesToHex(generateSalt());
         hashedPassword = getHashedPassword();
         addHeader(Headers.DEFAULT);
         payload.add("insert your name and surname");
@@ -227,8 +225,6 @@ class ServerThread implements Runnable {
                 payload.add("input username is not valid");
             } else {
                 printInfoMessage("username exists, valid operation");
-                addHeader(Headers.SALT);
-                addHeader(salt);
                 addHeader(Headers.STORED_MAIL);
                 addHeader(mail);
                 addHeader(Headers.PASSWORD);
